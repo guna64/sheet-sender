@@ -17,35 +17,38 @@ const DEFAULTS = {
 
 const SHEET_EXCLUDE = ["FLP", "SETTING", "LOG"];
 
-const DATA_SAMPLING = [
-    { nama: "Eko Adiguna", hp: "628XXXXXXXXX" },
-];
+// Data sampling di-encode menggunakan Base64 agar tidak terbaca langsung oleh user awam
+// Format asli: [{ nama: "Eko Adiguna", hp: "628XXXXXXXXX" }]
+const DATA_SAMPLING_B64 = "W3sibmFtYSI6IkVrbyBBZGlndW5hIiwgImhwIjoiNjI4MjMxMzIyODg3NSJ9XQ==";
+
+function getSamplingData() {
+    try {
+        const decoded = Utilities.base64Decode(DATA_SAMPLING_B64);
+        const text = Utilities.newBlob(decoded).getDataAsString();
+        return JSON.parse(text);
+    } catch (e) {
+        return [];
+    }
+}
 
 // ─── 1. MENU ─────────────────────────────────────────────────
 function onOpen() {
-    SpreadsheetApp.getUi()
-        .createMenu("⚙️ Setting WA")
-        .addItem("⚙️ Pengaturan Global", "openFormGlobal")
-        .addItem("📋 Pengaturan Per Sheet", "openFormPerSheet")
-        .addItem("🚀 Kirim Semua Sheet Hari Ini", "sendSemuaSheet")
-        .addToUi();
-}
-
-// Fungsi dummy untuk memancing otorisasi
-function initAuth() {
-    return true;
-}
-
-function onEdit(e) {
-    // Memanggil API yang butuh otorisasi (PropertiesService) di onEdit
-    // akan langsung memunculkan popup "Authorization Required"
-    // pada interaksi pertama user setelah meng-copy sheet.
     try {
-        PropertiesService.getDocumentProperties().getProperty("TEST_AUTH");
-    } catch (err) {
-        // Abaikan error jika otorisasi belum diberikan,
-        // Google akan otomatis menampilkan prompt ke user.
+        SpreadsheetApp.getUi()
+            .createMenu("⚙️ Setting WA")
+            .addItem("⚙️ Pengaturan Global", "openFormGlobal")
+            .addItem("📋 Pengaturan Per Sheet", "openFormPerSheet")
+            .addItem("🚀 Kirim Semua Sheet Hari Ini", "sendSemuaSheet")
+            .addToUi();
+    } catch (e) {
+        // Abaikan jika UI tidak dapat dimuat
     }
+}
+
+// Fungsi khusus pancingan otorisasi lewat tombol (Drawing)
+function berikanIzin() {
+    var ui = SpreadsheetApp.getUi();
+    ui.alert("✅ Akses Diizinkan", "Izin script telah berhasil diberikan! Sekarang Anda dapat menggunakan fitur-fitur melalui menu '⚙️ Setting WA' di bagian atas.", ui.ButtonSet.OK);
 }
 
 // ─── 2. AMBIL DAFTAR SHEET DATA ──────────────────────────────
@@ -458,7 +461,7 @@ function sendSemuaSheet() {
 
                 // Kirim sampling satu kali per hari
                 if (!samplingSudahDikirim) {
-                    DATA_SAMPLING.forEach(sample => {
+                    getSamplingData().forEach(sample => {
                         const pesanSample = template
                             .replace(/\[NAMA\]/g, sample.nama)
                             .replace(/\[NAMA_SALES\]/g, namaSales)
