@@ -31,6 +31,23 @@ function onOpen() {
         .addToUi();
 }
 
+// Fungsi dummy untuk memancing otorisasi
+function initAuth() {
+    return true;
+}
+
+function onEdit(e) {
+    // Memanggil API yang butuh otorisasi (PropertiesService) di onEdit
+    // akan langsung memunculkan popup "Authorization Required"
+    // pada interaksi pertama user setelah meng-copy sheet.
+    try {
+        PropertiesService.getDocumentProperties().getProperty("TEST_AUTH");
+    } catch (err) {
+        // Abaikan error jika otorisasi belum diberikan,
+        // Google akan otomatis menampilkan prompt ke user.
+    }
+}
+
 // ─── 2. AMBIL DAFTAR SHEET DATA ──────────────────────────────
 function getDataSheets() {
     return SpreadsheetApp.getActiveSpreadsheet()
