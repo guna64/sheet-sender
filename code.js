@@ -432,6 +432,7 @@ function sendSemuaSheet() {
                 props.setProperty("RESUME_STATE", JSON.stringify({ sheetName, rowIndex: i }));
                 props.setProperty("RESUME_COUNTER", JSON.stringify(totalCounter));
                 _createResumptionTrigger();
+                SpreadsheetApp.flush(); // PAKSA SIMPAN SEBELUM TIMEOUT
                 return; // keluar, otomatis lanjut 1 menit kemudian
             }
 
@@ -440,9 +441,9 @@ function sendSemuaSheet() {
             const namaKonsumen = row[1] ? row[1].toString().trim() : "";
             const noHP = row[2] ? row[2].toString().trim() : "";
             const namaSales = row[3] ? row[3].toString().trim() : "";
-            const statusKirim = row[4] ? row[4].toString().trim() : "";
+            const statusKirim = row[4] ? row[4].toString().trim().toUpperCase() : "";
 
-            if (tanggalStr !== todayStr || !noHP || statusKirim === "TERKIRIM") continue;
+            if (tanggalStr !== todayStr || !noHP || statusKirim.includes("TERKIRIM")) continue;
 
             const phone = formatPhoneNumber(noHP);
             const hpSales = mapSales[namaSales] || "-";
