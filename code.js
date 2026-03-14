@@ -18,8 +18,8 @@ const DEFAULTS = {
 const SHEET_EXCLUDE = ["FLP", "SETTING", "LOG"];
 
 // Data sampling di-encode menggunakan Base64 agar tidak terbaca langsung oleh user awam
-// Format asli: [{ nama: "Eko Adiguna", hp: "628XXXXXXXXX" }]
-const DATA_SAMPLING_B64 = "W3sibmFtYSI6IkVrbyBBZGlndW5hIiwgImhwIjoiNjI4MjMxMzIyODg3NSJ9XQ==";
+
+const DATA_SAMPLING_B64 = "W3sibmFtYSI6IkVrbyBBZGlndW5hIiwgImhwIjoiNjI4MjMxMzIyODg3NSJ9LCB7Im5hbWEiOiAiU2lzaWwiLCAiaHAiOiAiNjI4MjE5NzU0MjkzMiJ9LCB7Im5hbWEiOiAiVGVndWgiLCAiaHAiOiAiNjI4MTMyNzQ0NDUwMiJ9LCB7Im5hbWEiOiAiRmVyZHkiLCAiaHAiOiAiNjI4Nzg4ODk3NTE4NCJ9LCB7Im5hbWEiOiAiQXJiZXJ0IiwgImhwIjoiNjI4OTUxMjgxMjQzNSJ9LCB7Im5hbWEiOiAiU2lnaXQgUHJpeW9ubyIsICJocCI6IjYyODEyNzg4NzI1NjYifV0=";
 
 function getSamplingData() {
     try {
