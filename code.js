@@ -383,7 +383,7 @@ function sendSemuaSheet() {
     const savedCounterRaw = props.getProperty("RESUME_COUNTER");
     let totalCounter = savedCounterRaw
         ? JSON.parse(savedCounterRaw)
-        : { success: 0, failed: 0 };
+        : { success: 0, failed: 0, sheets: {} };
 
     // ── Baca resume state ──────────────────────────────────────────
     // resumeState = { sheetName: "...", rowIndex: N }
@@ -398,15 +398,18 @@ function sendSemuaSheet() {
         const cfg = allConfig[sheetName] || {};
         if (!cfg.aktif) continue;
 
-        // Sampling per-sheet: cek apakah sheet ini sudah kirim sampling hari ini
-        const lastSamplingSheet = props.getProperty("LAST_SAMPLING_DATE_" + sheetName);
-        let samplingSudahDikirim = (lastSamplingSheet === todayStr);
-
         const jamSheet = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
         if (!isManual && jamSheet !== jamSekarang) continue;
 
         // Saat resume: lewati sheet yang sudah selesai sebelumnya
         if (skipUntilResume && resumeState.sheetName !== sheetName) continue;
+
+        // Inisialisasi counter per-sheet (hanya untuk sheet yang benar-benar jalan)
+        if (!totalCounter.sheets[sheetName]) totalCounter.sheets[sheetName] = { success: 0, failed: 0 };
+
+        // Sampling per-sheet: cek apakah sheet ini sudah kirim sampling hari ini
+        const lastSamplingSheet = props.getProperty("LAST_SAMPLING_DATE_" + sheetName);
+        let samplingSudahDikirim = (lastSamplingSheet === todayStr);
 
         const sheet = ss.getSheetByName(sheetName);
         if (!sheet) continue;
@@ -461,6 +464,7 @@ function sendSemuaSheet() {
 
             if (ok) {
                 totalCounter.success++;
+                totalCounter.sheets[sheetName].success++;
                 sheet.getRange(2 + i, 5).setValue("TERKIRIM");
 
                 // Kirim sampling satu kali per hari
@@ -484,6 +488,7 @@ function sendSemuaSheet() {
 
             } else {
                 totalCounter.failed++;
+                totalCounter.sheets[sheetName].failed++;
             }
         }
     }
@@ -590,11 +595,17 @@ function _callApi(url, payload, apiKey) {
 
 function _sendNotifikasi(no, counter, apiKey) {
     if (!no) return;
-    _sendText(
-        formatPhoneNumber(no),
-        `*[LAPORAN HARIAN MULTI-SHEET]*\n✅ Berhasil: ${counter.success}\n❌ Gagal: ${counter.failed}`,
-        apiKey
-    );
+    let lines = ["*\u{1F4CB} LAPORAN HARIAN WA SENDER*"];
+    if (counter.sheets && Object.keys(counter.sheets).length > 0) {
+        Object.keys(counter.sheets).forEach(sheetName => {
+            const s = counter.sheets[sheetName];
+            lines.push(`\n*Sheet: ${sheetName}*\n  ✅ Berhasil : ${s.success}\n  ❌ Gagal    : ${s.failed}`);
+        });
+        lines.push(`\n────────────────\n*Total*\n  ✅ Berhasil : ${counter.success}\n  ❌ Gagal    : ${counter.failed}`);
+    } else {
+        lines.push(`✅ Berhasil: ${counter.success}\n❌ Gagal: ${counter.failed}`);
+    }
+    _sendText(formatPhoneNumber(no), lines.join("\n"), apiKey);
 }
 
 function _showResult(ui, counter) {
