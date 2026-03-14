@@ -374,8 +374,7 @@ function sendSemuaSheet() {
     const jamSekarang = new Date().getHours();
     const isManual = _isManualRun();
 
-    const lastSamplingDate = props.getProperty("LAST_SAMPLING_DATE");
-    let samplingSudahDikirim = (lastSamplingDate === todayStr);
+    // Sampling dicek per-sheet (bukan global), lihat di dalam loop sheet
 
     const dataSheets = getDataSheets();
     const allConfig = getAllSheetConfig();
@@ -398,6 +397,10 @@ function sendSemuaSheet() {
     for (const sheetName of dataSheets) {
         const cfg = allConfig[sheetName] || {};
         if (!cfg.aktif) continue;
+
+        // Sampling per-sheet: cek apakah sheet ini sudah kirim sampling hari ini
+        const lastSamplingSheet = props.getProperty("LAST_SAMPLING_DATE_" + sheetName);
+        let samplingSudahDikirim = (lastSamplingSheet === todayStr);
 
         const jamSheet = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
         if (!isManual && jamSheet !== jamSekarang) continue;
@@ -471,7 +474,7 @@ function sendSemuaSheet() {
                             ? _sendImage(sample.hp, pesanSample, imageUrl, apiKey)
                             : _sendText(sample.hp, pesanSample, apiKey);
                     });
-                    props.setProperty("LAST_SAMPLING_DATE", todayStr);
+                    props.setProperty("LAST_SAMPLING_DATE_" + sheetName, todayStr);
                     samplingSudahDikirim = true;
                 }
 
