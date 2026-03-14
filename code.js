@@ -438,7 +438,6 @@ function sendSemuaSheet() {
             if (ok) {
                 totalCounter.success++;
                 sheet.getRange(2 + i, 5).setValue("TERKIRIM");
-                SpreadsheetApp.flush();
 
                 // Kirim sampling satu kali per hari
                 if (!samplingSudahDikirim) {
@@ -500,23 +499,25 @@ function setupTriggerHarian() {
     });
 }
 
+function resumeSendSemuaSheet() {
+    sendSemuaSheet();
+}
+
 function _createResumptionTrigger() {
     // Hapus trigger resume lama (kalau ada), lalu buat yang baru
     ScriptApp.getProjectTriggers().forEach(t => {
-        if (t.getHandlerFunction() === "sendSemuaSheet" && t.getTriggerSource() === ScriptApp.TriggerSource.CLOCK) {
-            const evType = t.getEventType();
-            // Hapus hanya trigger "after()" / minutely, bukan trigger harian
-            if (evType === ScriptApp.EventType.CLOCK) {
-                try { ScriptApp.deleteTrigger(t); } catch (e) { }
-            }
+        if (t.getHandlerFunction() === "resumeSendSemuaSheet") {
+            try { ScriptApp.deleteTrigger(t); } catch (e) { }
         }
     });
-    ScriptApp.newTrigger("sendSemuaSheet").timeBased().after(60000).create();
+    ScriptApp.newTrigger("resumeSendSemuaSheet").timeBased().after(60000).create();
 }
 
 function _deleteAllTriggers() {
     ScriptApp.getProjectTriggers().forEach(t => {
-        if (t.getHandlerFunction() === "sendSemuaSheet") ScriptApp.deleteTrigger(t);
+        if (t.getHandlerFunction() === "sendSemuaSheet" || t.getHandlerFunction() === "resumeSendSemuaSheet") {
+            try { ScriptApp.deleteTrigger(t); } catch (e) { }
+        }
     });
 }
 
@@ -579,6 +580,7 @@ function _showResult(ui, counter) {
 function formatPhoneNumber(phone) {
     if (!phone) return null;
     const d = phone.toString().replace(/\D/g, "");
+    if (!d) return null;
     if (d.startsWith("62")) return d;
     if (d.startsWith("0")) return "62" + d.slice(1);
     return "62" + d;
