@@ -41,7 +41,7 @@ globalThis.getDataSheets_lib = function() {
 
 // ─── 3. PENGATURAN GLOBAL ─────────────────────────────────────
 globalThis.openFormGlobal_lib = function() {
-  const props   = PropertiesService.getDocumentProperties();
+  const props = PropertiesService.getDocumentProperties();
   const apiKey  = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
   const noNotif = props.getProperty("NO_HP_NOTIF")    || DEFAULTS.NO_HP_NOTIF;
 
