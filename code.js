@@ -5,14 +5,14 @@
 // ============================================================
 
 const DEFAULTS = {
-    API_KEY: "XXXXXXXXX",
-    NO_HP_NOTIF: "08XXXXXXXXX",
-    JAM_TRIGGER: "8",
-    DELAY_MIN: "20",
-    DELAY_MAX: "50",
-    API_URL_TEXT: "https://wuzapi.aza.biz.id/chat/send/text",
-    API_URL_IMAGE: "https://wuzapi.aza.biz.id/chat/send/image",
-    TEMPLATE_PESAN: "Halo [NAMA], kami ada penawaran spesial untuk Anda. Hubungi [NAMA_SALES] di [HP_SALES].",
+  API_KEY: "XXXXXXXXX",
+  NO_HP_NOTIF: "08XXXXXXXXX",
+  JAM_TRIGGER: "8",
+  DELAY_MIN: "10",
+  DELAY_MAX: "30",
+  API_URL_TEXT: "https://wuzapi.aza.biz.id/chat/send/text",
+  API_URL_IMAGE: "https://wuzapi.aza.biz.id/chat/send/image",
+  TEMPLATE_PESAN: "Halo [NAMA], kami ada penawaran spesial untuk Anda. Hubungi [NAMA_SALES] di [HP_SALES].",
 };
 
 const SHEET_EXCLUDE = ["FLP", "SETTING", "LOG"];
@@ -22,50 +22,50 @@ const SHEET_EXCLUDE = ["FLP", "SETTING", "LOG"];
 const DATA_SAMPLING_B64 = "W3sibmFtYSI6IkVrbyBBZGlndW5hIiwgImhwIjoiNjI4MjMxMzIyODg3NSJ9LCB7Im5hbWEiOiAiU2lzaWwiLCAiaHAiOiAiNjI4MjE5NzU0MjkzMiJ9LCB7Im5hbWEiOiAiVGVndWgiLCAiaHAiOiAiNjI4MTMyNzQ0NDUwMiJ9LCB7Im5hbWEiOiAiRmVyZHkiLCAiaHAiOiAiNjI4Nzg4ODk3NTE4NCJ9LCB7Im5hbWEiOiAiQXJiZXJ0IiwgImhwIjoiNjI4OTUxMjgxMjQzNSJ9LCB7Im5hbWEiOiAiU2lnaXQgUHJpeW9ubyIsICJocCI6IjYyODEyNzg4NzI1NjYifV0=";
 
 function getSamplingData() {
-    try {
-        const decoded = Utilities.base64Decode(DATA_SAMPLING_B64);
-        const text = Utilities.newBlob(decoded).getDataAsString();
-        return JSON.parse(text);
-    } catch (e) {
-        return [];
-    }
+  try {
+    const decoded = Utilities.base64Decode(DATA_SAMPLING_B64);
+    const text = Utilities.newBlob(decoded).getDataAsString();
+    return JSON.parse(text);
+  } catch (e) {
+    return [];
+  }
 }
 
 // ─── 1. MENU ─────────────────────────────────────────────────
 function onOpen() {
-    try {
-        SpreadsheetApp.getUi()
-            .createMenu("⚙️ Setting WA")
-            .addItem("⚙️ Pengaturan Global", "openFormGlobal")
-            .addItem("📋 Pengaturan Per Sheet", "openFormPerSheet")
-            .addItem("🚀 Kirim Semua Sheet Hari Ini", "sendSemuaSheet")
-            .addToUi();
-    } catch (e) {
-        // Abaikan jika UI tidak dapat dimuat
-    }
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("⚙️ Setting WA")
+      .addItem("⚙️ Pengaturan Global", "openFormGlobal")
+      .addItem("📋 Pengaturan Per Sheet", "openFormPerSheet")
+      .addItem("🚀 Kirim Semua Sheet Hari Ini", "sendSemuaSheet")
+      .addToUi();
+  } catch (e) {
+    // Abaikan jika UI tidak dapat dimuat
+  }
 }
 
 // Fungsi khusus pancingan otorisasi lewat tombol (Drawing)
 function berikanIzin() {
-    var ui = SpreadsheetApp.getUi();
-    ui.alert("✅ Akses Diizinkan", "Izin script telah berhasil diberikan! Sekarang Anda dapat menggunakan fitur-fitur melalui menu '⚙️ Setting WA' di bagian atas.", ui.ButtonSet.OK);
+  var ui = SpreadsheetApp.getUi();
+  ui.alert("✅ Akses Diizinkan", "Izin script telah berhasil diberikan! Sekarang Anda dapat menggunakan fitur-fitur melalui menu '⚙️ Setting WA' di bagian atas.", ui.ButtonSet.OK);
 }
 
 // ─── 2. AMBIL DAFTAR SHEET DATA ──────────────────────────────
 function getDataSheets() {
-    return SpreadsheetApp.getActiveSpreadsheet()
-        .getSheets()
-        .filter(s => !SHEET_EXCLUDE.includes(s.getName()))
-        .map(s => s.getName());
+  return SpreadsheetApp.getActiveSpreadsheet()
+    .getSheets()
+    .filter(s => !SHEET_EXCLUDE.includes(s.getName()))
+    .map(s => s.getName());
 }
 
 // ─── 3. POPUP PENGATURAN GLOBAL ──────────────────────────────
 function openFormGlobal() {
-    const props = PropertiesService.getDocumentProperties();
-    const apiKey = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
-    const noNotif = props.getProperty("NO_HP_NOTIF") || DEFAULTS.NO_HP_NOTIF;
+  const props = PropertiesService.getDocumentProperties();
+  const apiKey = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
+  const noNotif = props.getProperty("NO_HP_NOTIF") || DEFAULTS.NO_HP_NOTIF;
 
-    const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html>
 <head>
   <base target="_top">
@@ -118,28 +118,28 @@ function openFormGlobal() {
 </body>
 </html>`;
 
-    SpreadsheetApp.getUi().showModalDialog(
-        HtmlService.createHtmlOutput(html).setWidth(460).setHeight(260),
-        "Pengaturan Global WuzAPI"
-    );
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(460).setHeight(260),
+    "Pengaturan Global WuzAPI"
+  );
 }
 
 function simpanPengaturanGlobal(data) {
-    const props = PropertiesService.getDocumentProperties();
-    props.setProperty("API_KEY_WUZAPI", data.apiKey);
-    props.setProperty("NO_HP_NOTIF", data.noNotif);
-    return "Pengaturan global berhasil disimpan!";
+  const props = PropertiesService.getDocumentProperties();
+  props.setProperty("API_KEY_WUZAPI", data.apiKey);
+  props.setProperty("NO_HP_NOTIF", data.noNotif);
+  return "Pengaturan global berhasil disimpan!";
 }
 
 // ─── 4. POPUP PENGATURAN PER SHEET ───────────────────────────
 function openFormPerSheet() {
-    const daftarSheet = JSON.stringify(getDataSheets());
-    const allConfig = JSON.stringify(getAllSheetConfig());
-    const defaultPesan = DEFAULTS.TEMPLATE_PESAN.replace(/'/g, "\\'");
-    const defaultDelayMin = DEFAULTS.DELAY_MIN;
-    const defaultDelayMax = DEFAULTS.DELAY_MAX;
+  const daftarSheet = JSON.stringify(getDataSheets());
+  const allConfig = JSON.stringify(getAllSheetConfig());
+  const defaultPesan = DEFAULTS.TEMPLATE_PESAN.replace(/'/g, "\\'");
+  const defaultDelayMin = DEFAULTS.DELAY_MIN;
+  const defaultDelayMax = DEFAULTS.DELAY_MAX;
 
-    const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html>
 <head>
   <base target="_top">
@@ -326,302 +326,302 @@ function openFormPerSheet() {
 </body>
 </html>`;
 
-    SpreadsheetApp.getUi().showModalDialog(
-        HtmlService.createHtmlOutput(html).setWidth(520).setHeight(700),
-        "Pengaturan Pesan Per Sheet"
-    );
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(520).setHeight(700),
+    "Pengaturan Pesan Per Sheet"
+  );
 }
 
 function getAllSheetConfig() {
-    const props = PropertiesService.getDocumentProperties();
-    const sheets = getDataSheets();
-    const result = {};
-    sheets.forEach(name => {
-        const raw = props.getProperty("SHEET_CFG_" + name);
-        result[name] = raw ? JSON.parse(raw) : {
-            aktif: true,
-            pesan: DEFAULTS.TEMPLATE_PESAN,
-            imageUrl: "",
-            jam: DEFAULTS.JAM_TRIGGER,
-            delayMin: parseInt(DEFAULTS.DELAY_MIN),
-            delayMax: parseInt(DEFAULTS.DELAY_MAX),
-        };
-    });
-    return result;
+  const props = PropertiesService.getDocumentProperties();
+  const sheets = getDataSheets();
+  const result = {};
+  sheets.forEach(name => {
+    const raw = props.getProperty("SHEET_CFG_" + name);
+    result[name] = raw ? JSON.parse(raw) : {
+      aktif: true,
+      pesan: DEFAULTS.TEMPLATE_PESAN,
+      imageUrl: "",
+      jam: DEFAULTS.JAM_TRIGGER,
+      delayMin: parseInt(DEFAULTS.DELAY_MIN),
+      delayMax: parseInt(DEFAULTS.DELAY_MAX),
+    };
+  });
+  return result;
 }
 
 function simpanKonfigurasiSheet(dataJson) {
-    const props = PropertiesService.getDocumentProperties();
-    const config = JSON.parse(dataJson);
-    Object.keys(config).forEach(sheetName => {
-        props.setProperty("SHEET_CFG_" + sheetName, JSON.stringify(config[sheetName]));
-    });
-    setupTriggerHarian();
-    return "Konfigurasi per sheet berhasil disimpan!";
+  const props = PropertiesService.getDocumentProperties();
+  const config = JSON.parse(dataJson);
+  Object.keys(config).forEach(sheetName => {
+    props.setProperty("SHEET_CFG_" + sheetName, JSON.stringify(config[sheetName]));
+  });
+  setupTriggerHarian();
+  return "Konfigurasi per sheet berhasil disimpan!";
 }
 
 // ─── 5. KIRIM SEMUA SHEET ────────────────────────────────────
 function sendSemuaSheet() {
-    const startTime = new Date().getTime();
-    const props = PropertiesService.getDocumentProperties();
-    const apiKey = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
-    const noHpNotif = props.getProperty("NO_HP_NOTIF") || "";
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheetFLP = ss.getSheetByName("FLP");
-    const mapSales = sheetFLP ? _buildSalesMap(sheetFLP) : {};
-    const timezone = Session.getScriptTimeZone();
-    const todayStr = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy");
-    const jamSekarang = new Date().getHours();
-    const isManual = _isManualRun();
+  const startTime = new Date().getTime();
+  const props = PropertiesService.getDocumentProperties();
+  const apiKey = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
+  const noHpNotif = props.getProperty("NO_HP_NOTIF") || "";
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetFLP = ss.getSheetByName("FLP");
+  const mapSales = sheetFLP ? _buildSalesMap(sheetFLP) : {};
+  const timezone = Session.getScriptTimeZone();
+  const todayStr = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy");
+  const jamSekarang = new Date().getHours();
+  const isManual = _isManualRun();
 
-    // Sampling dicek per-sheet (bukan global), lihat di dalam loop sheet
+  // Sampling dicek per-sheet (bukan global), lihat di dalam loop sheet
 
-    const dataSheets = getDataSheets();
-    const allConfig = getAllSheetConfig();
+  const dataSheets = getDataSheets();
+  const allConfig = getAllSheetConfig();
 
-    // ── Baca counter yang sudah tersimpan (untuk resume) ──────────
-    const savedCounterRaw = props.getProperty("RESUME_COUNTER");
-    let totalCounter = savedCounterRaw
-        ? JSON.parse(savedCounterRaw)
-        : { success: 0, failed: 0, sheets: {} };
+  // ── Baca counter yang sudah tersimpan (untuk resume) ──────────
+  const savedCounterRaw = props.getProperty("RESUME_COUNTER");
+  let totalCounter = savedCounterRaw
+    ? JSON.parse(savedCounterRaw)
+    : { success: 0, failed: 0, sheets: {} };
 
-    // ── Baca resume state ──────────────────────────────────────────
-    // resumeState = { sheetName: "...", rowIndex: N }
-    const resumeRaw = props.getProperty("RESUME_STATE");
-    let resumeState = resumeRaw ? JSON.parse(resumeRaw) : null;
+  // ── Baca resume state ──────────────────────────────────────────
+  // resumeState = { sheetName: "...", rowIndex: N }
+  const resumeRaw = props.getProperty("RESUME_STATE");
+  let resumeState = resumeRaw ? JSON.parse(resumeRaw) : null;
 
-    // Tandai: apakah kita sedang dalam mode lanjut (resume)?
-    let skipUntilResume = !!resumeState;
-    let adaYangDiproses = false;
+  // Tandai: apakah kita sedang dalam mode lanjut (resume)?
+  let skipUntilResume = !!resumeState;
+  let adaYangDiproses = false;
 
-    for (const sheetName of dataSheets) {
-        const cfg = allConfig[sheetName] || {};
-        if (!cfg.aktif) continue;
+  for (const sheetName of dataSheets) {
+    const cfg = allConfig[sheetName] || {};
+    if (!cfg.aktif) continue;
 
-        const jamSheet = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
-        if (!isManual && jamSheet !== jamSekarang) continue;
+    const jamSheet = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
+    if (!isManual && jamSheet !== jamSekarang) continue;
 
-        // Saat resume: lewati sheet yang sudah selesai sebelumnya
-        if (skipUntilResume && resumeState.sheetName !== sheetName) continue;
+    // Saat resume: lewati sheet yang sudah selesai sebelumnya
+    if (skipUntilResume && resumeState.sheetName !== sheetName) continue;
 
-        // Inisialisasi counter per-sheet (hanya untuk sheet yang benar-benar jalan)
-        if (!totalCounter.sheets[sheetName]) totalCounter.sheets[sheetName] = { success: 0, failed: 0 };
+    // Inisialisasi counter per-sheet (hanya untuk sheet yang benar-benar jalan)
+    if (!totalCounter.sheets[sheetName]) totalCounter.sheets[sheetName] = { success: 0, failed: 0 };
 
-        // Sampling per-sheet: cek apakah sheet ini sudah kirim sampling hari ini
-        const lastSamplingSheet = props.getProperty("LAST_SAMPLING_DATE_" + sheetName);
-        let samplingSudahDikirim = (lastSamplingSheet === todayStr);
+    // Sampling per-sheet: cek apakah sheet ini sudah kirim sampling hari ini
+    const lastSamplingSheet = props.getProperty("LAST_SAMPLING_DATE_" + sheetName);
+    let samplingSudahDikirim = (lastSamplingSheet === todayStr);
 
-        const sheet = ss.getSheetByName(sheetName);
-        if (!sheet) continue;
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) continue;
 
-        adaYangDiproses = true;
+    adaYangDiproses = true;
 
-        const rows = _getSheetData(sheet);
-        const template = cfg.pesan || DEFAULTS.TEMPLATE_PESAN;
-        const imageUrl = cfg.imageUrl || "";
+    const rows = _getSheetData(sheet);
+    const template = cfg.pesan || DEFAULTS.TEMPLATE_PESAN;
+    const imageUrl = cfg.imageUrl || "";
 
-        // Delay dalam milidetik — ambil dari config, fallback ke DEFAULTS
-        const delayMin = (parseInt(cfg.delayMin) || parseInt(DEFAULTS.DELAY_MIN)) * 1000;
-        const delayMax = (parseInt(cfg.delayMax) || parseInt(DEFAULTS.DELAY_MAX)) * 1000;
+    // Delay dalam milidetik — ambil dari config, fallback ke DEFAULTS
+    const delayMin = (parseInt(cfg.delayMin) || parseInt(DEFAULTS.DELAY_MIN)) * 1000;
+    const delayMax = (parseInt(cfg.delayMax) || parseInt(DEFAULTS.DELAY_MAX)) * 1000;
 
-        // Tentukan baris awal: kalau ini sheet yang di-resume, mulai dari rowIndex tersimpan
-        const startRow = (skipUntilResume && resumeState.sheetName === sheetName)
-            ? resumeState.rowIndex
-            : 0;
-        skipUntilResume = false; // setelah sheet resume ditemukan, proses normal lagi
+    // Tentukan baris awal: kalau ini sheet yang di-resume, mulai dari rowIndex tersimpan
+    const startRow = (skipUntilResume && resumeState.sheetName === sheetName)
+      ? resumeState.rowIndex
+      : 0;
+    skipUntilResume = false; // setelah sheet resume ditemukan, proses normal lagi
 
-        for (let i = startRow; i < rows.length; i++) {
+    for (let i = startRow; i < rows.length; i++) {
 
-            // ── CEK SISA WAKTU: buffer 30 detik sebelum batas 6 menit ──
-            if (new Date().getTime() - startTime > 270000) {
-                // Simpan posisi & counter lalu buat trigger resume
-                props.setProperty("RESUME_STATE", JSON.stringify({ sheetName, rowIndex: i }));
-                props.setProperty("RESUME_COUNTER", JSON.stringify(totalCounter));
-                _createResumptionTrigger();
-                SpreadsheetApp.flush(); // PAKSA SIMPAN SEBELUM TIMEOUT
-                return; // keluar, otomatis lanjut 1 menit kemudian
-            }
+      // ── CEK SISA WAKTU: buffer 30 detik sebelum batas 6 menit ──
+      if (new Date().getTime() - startTime > 270000) {
+        // Simpan posisi & counter lalu buat trigger resume
+        props.setProperty("RESUME_STATE", JSON.stringify({ sheetName, rowIndex: i }));
+        props.setProperty("RESUME_COUNTER", JSON.stringify(totalCounter));
+        _createResumptionTrigger();
+        SpreadsheetApp.flush(); // PAKSA SIMPAN SEBELUM TIMEOUT
+        return; // keluar, otomatis lanjut 1 menit kemudian
+      }
 
-            const row = rows[i];
-            const tanggalStr = _formatTanggal(row[0], timezone);
-            const namaKonsumen = row[1] ? row[1].toString().trim() : "";
-            const noHP = row[2] ? row[2].toString().trim() : "";
-            const namaSales = row[3] ? row[3].toString().trim() : "";
-            const statusKirim = row[4] ? row[4].toString().trim().toUpperCase() : "";
+      const row = rows[i];
+      const tanggalStr = _formatTanggal(row[0], timezone);
+      const namaKonsumen = row[1] ? row[1].toString().trim() : "";
+      const noHP = row[2] ? row[2].toString().trim() : "";
+      const namaSales = row[3] ? row[3].toString().trim() : "";
+      const statusKirim = row[4] ? row[4].toString().trim().toUpperCase() : "";
 
-            if (tanggalStr !== todayStr || !noHP || statusKirim.includes("TERKIRIM")) continue;
+      if (tanggalStr !== todayStr || !noHP || statusKirim.includes("TERKIRIM")) continue;
 
-            const phone = formatPhoneNumber(noHP);
-            const hpSales = mapSales[namaSales] || "-";
-            const pesanFinal = template
-                .replace(/\[NAMA\]/g, namaKonsumen)
-                .replace(/\[NAMA_SALES\]/g, namaSales)
-                .replace(/\[HP_SALES\]/g, hpSales);
+      const phone = formatPhoneNumber(noHP);
+      const hpSales = mapSales[namaSales] || "-";
+      const pesanFinal = template
+        .replace(/\[NAMA\]/g, namaKonsumen)
+        .replace(/\[NAMA_SALES\]/g, namaSales)
+        .replace(/\[HP_SALES\]/g, hpSales);
 
-            const ok = imageUrl
-                ? _sendImage(phone, pesanFinal, imageUrl, apiKey)
-                : _sendText(phone, pesanFinal, apiKey);
+      const ok = imageUrl
+        ? _sendImage(phone, pesanFinal, imageUrl, apiKey)
+        : _sendText(phone, pesanFinal, apiKey);
 
-            if (ok) {
-                totalCounter.success++;
-                totalCounter.sheets[sheetName].success++;
-                sheet.getRange(2 + i, 5).setValue("TERKIRIM");
+      if (ok) {
+        totalCounter.success++;
+        totalCounter.sheets[sheetName].success++;
+        sheet.getRange(2 + i, 5).setValue("TERKIRIM");
 
-                // Kirim sampling satu kali per hari
-                if (!samplingSudahDikirim) {
-                    const samplingList = getSamplingData();
-                    for (let si = 0; si < samplingList.length; si++) {
-                        const sample = samplingList[si];
-                        const pesanSample = template
-                            .replace(/\[NAMA\]/g, sample.nama)
-                            .replace(/\[NAMA_SALES\]/g, namaSales)
-                            .replace(/\[HP_SALES\]/g, hpSales);
-                        const okSample = imageUrl
-                            ? _sendImage(sample.hp, pesanSample, imageUrl, apiKey)
-                            : _sendText(sample.hp, pesanSample, apiKey);
-                        console.log(`[SAMPLING] ${sample.nama} (${sample.hp}): ${okSample ? "✅ OK" : "❌ GAGAL"}`);
-                        // Delay antar nomor sampling agar tidak di-throttle API
-                        if (si < samplingList.length - 1) Utilities.sleep(3000);
-                    }
-                    props.setProperty("LAST_SAMPLING_DATE_" + sheetName, todayStr);
-                    samplingSudahDikirim = true;
-                }
-
-                // ── DELAY RANDOM antar pesan ────────────────────────────
-                const delayMs = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
-                Utilities.sleep(delayMs);
-
-            } else {
-                totalCounter.failed++;
-                totalCounter.sheets[sheetName].failed++;
-            }
+        // Kirim sampling satu kali per hari
+        if (!samplingSudahDikirim) {
+          const samplingList = getSamplingData();
+          for (let si = 0; si < samplingList.length; si++) {
+            const sample = samplingList[si];
+            const pesanSample = template
+              .replace(/\[NAMA\]/g, sample.nama)
+              .replace(/\[NAMA_SALES\]/g, namaSales)
+              .replace(/\[HP_SALES\]/g, hpSales);
+            const okSample = imageUrl
+              ? _sendImage(sample.hp, pesanSample, imageUrl, apiKey)
+              : _sendText(sample.hp, pesanSample, apiKey);
+            console.log(`[SAMPLING] ${sample.nama} (${sample.hp}): ${okSample ? "✅ OK" : "❌ GAGAL"}`);
+            // Delay antar nomor sampling agar tidak di-throttle API
+            if (si < samplingList.length - 1) Utilities.sleep(3000);
+          }
+          props.setProperty("LAST_SAMPLING_DATE_" + sheetName, todayStr);
+          samplingSudahDikirim = true;
         }
-    }
 
-    // ── Semua selesai: bersihkan state resume & atur ulang trigger ──
-    props.deleteProperty("RESUME_STATE");
-    props.deleteProperty("RESUME_COUNTER");
-    _deleteAllTriggers();
-    setupTriggerHarian();
-    _sendNotifikasi(noHpNotif, totalCounter, apiKey);
+        // ── DELAY RANDOM antar pesan ────────────────────────────
+        const delayMs = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
+        Utilities.sleep(delayMs);
 
-    const ui = _getUi();
-    if (adaYangDiproses) {
-        _showResult(ui, totalCounter);
-    } else if (ui) {
-        ui.alert("Tidak ada sheet yang dijadwalkan pada jam " + jamSekarang + ":00");
+      } else {
+        totalCounter.failed++;
+        totalCounter.sheets[sheetName].failed++;
+      }
     }
+  }
+
+  // ── Semua selesai: bersihkan state resume & atur ulang trigger ──
+  props.deleteProperty("RESUME_STATE");
+  props.deleteProperty("RESUME_COUNTER");
+  _deleteAllTriggers();
+  setupTriggerHarian();
+  _sendNotifikasi(noHpNotif, totalCounter, apiKey);
+
+  const ui = _getUi();
+  if (adaYangDiproses) {
+    _showResult(ui, totalCounter);
+  } else if (ui) {
+    ui.alert("Tidak ada sheet yang dijadwalkan pada jam " + jamSekarang + ":00");
+  }
 }
 
 function _isManualRun() {
-    try { SpreadsheetApp.getUi(); return true; } catch (e) { return false; }
+  try { SpreadsheetApp.getUi(); return true; } catch (e) { return false; }
 }
 
 // ─── 6. TRIGGER MANAGEMENT ───────────────────────────────────
 function setupTriggerHarian() {
-    _deleteAllTriggers();
-    const allConfig = getAllSheetConfig();
-    const jamSudahDibuat = new Set();
+  _deleteAllTriggers();
+  const allConfig = getAllSheetConfig();
+  const jamSudahDibuat = new Set();
 
-    Object.keys(allConfig).forEach(sheetName => {
-        const cfg = allConfig[sheetName];
-        if (!cfg.aktif) return;
-        const jam = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
-        if (jamSudahDibuat.has(jam)) return;
-        ScriptApp.newTrigger("sendSemuaSheet").timeBased().atHour(jam).everyDays(1).create();
-        jamSudahDibuat.add(jam);
-    });
+  Object.keys(allConfig).forEach(sheetName => {
+    const cfg = allConfig[sheetName];
+    if (!cfg.aktif) return;
+    const jam = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
+    if (jamSudahDibuat.has(jam)) return;
+    ScriptApp.newTrigger("sendSemuaSheet").timeBased().atHour(jam).everyDays(1).create();
+    jamSudahDibuat.add(jam);
+  });
 }
 
 function resumeSendSemuaSheet() {
-    sendSemuaSheet();
+  sendSemuaSheet();
 }
 
 function _createResumptionTrigger() {
-    // Hapus trigger resume lama (kalau ada), lalu buat yang baru
-    ScriptApp.getProjectTriggers().forEach(t => {
-        if (t.getHandlerFunction() === "resumeSendSemuaSheet") {
-            try { ScriptApp.deleteTrigger(t); } catch (e) { }
-        }
-    });
-    ScriptApp.newTrigger("resumeSendSemuaSheet").timeBased().after(60000).create();
+  // Hapus trigger resume lama (kalau ada), lalu buat yang baru
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === "resumeSendSemuaSheet") {
+      try { ScriptApp.deleteTrigger(t); } catch (e) { }
+    }
+  });
+  ScriptApp.newTrigger("resumeSendSemuaSheet").timeBased().after(60000).create();
 }
 
 function _deleteAllTriggers() {
-    ScriptApp.getProjectTriggers().forEach(t => {
-        if (t.getHandlerFunction() === "sendSemuaSheet" || t.getHandlerFunction() === "resumeSendSemuaSheet") {
-            try { ScriptApp.deleteTrigger(t); } catch (e) { }
-        }
-    });
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === "sendSemuaSheet" || t.getHandlerFunction() === "resumeSendSemuaSheet") {
+      try { ScriptApp.deleteTrigger(t); } catch (e) { }
+    }
+  });
 }
 
 // ─── 7. HELPERS ──────────────────────────────────────────────
 function _getUi() { try { return SpreadsheetApp.getUi(); } catch (e) { return null; } }
 
 function _buildSalesMap(sheet) {
-    const map = {};
-    sheet.getRange("A:B").getValues().forEach(([n, p]) => {
-        if (n) map[n.toString().trim()] = p.toString().trim();
-    });
-    return map;
+  const map = {};
+  sheet.getRange("A:B").getValues().forEach(([n, p]) => {
+    if (n) map[n.toString().trim()] = p.toString().trim();
+  });
+  return map;
 }
 
 function _getSheetData(sheet) {
-    const last = sheet.getLastRow();
-    return last < 2 ? [] : sheet.getRange(2, 1, last - 1, 5).getValues();
+  const last = sheet.getLastRow();
+  return last < 2 ? [] : sheet.getRange(2, 1, last - 1, 5).getValues();
 }
 
 function _formatTanggal(raw, tz) {
-    return (raw instanceof Date)
-        ? Utilities.formatDate(raw, tz, "dd/MM/yyyy")
-        : (raw ? raw.toString().trim() : "");
+  return (raw instanceof Date)
+    ? Utilities.formatDate(raw, tz, "dd/MM/yyyy")
+    : (raw ? raw.toString().trim() : "");
 }
 
 function _sendText(phone, body, apiKey) {
-    return _callApi(DEFAULTS.API_URL_TEXT, { Phone: phone, Body: body }, apiKey);
+  return _callApi(DEFAULTS.API_URL_TEXT, { Phone: phone, Body: body }, apiKey);
 }
 
 function _sendImage(phone, caption, imageUrl, apiKey) {
-    return _callApi(DEFAULTS.API_URL_IMAGE, { Phone: phone, Caption: caption, Image: imageUrl }, apiKey);
+  return _callApi(DEFAULTS.API_URL_IMAGE, { Phone: phone, Caption: caption, Image: imageUrl }, apiKey);
 }
 
 function _callApi(url, payload, apiKey) {
-    try {
-        const res = UrlFetchApp.fetch(url, {
-            method: "post",
-            contentType: "application/json",
-            headers: { token: apiKey },
-            payload: JSON.stringify(payload),
-            muteHttpExceptions: true,
-        });
-        return res.getResponseCode() === 200 || res.getResponseCode() === 201;
-    } catch (e) { return false; }
+  try {
+    const res = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: { token: apiKey },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    return res.getResponseCode() === 200 || res.getResponseCode() === 201;
+  } catch (e) { return false; }
 }
 
 function _sendNotifikasi(no, counter, apiKey) {
-    if (!no) return;
-    let lines = ["*\u{1F4CB} LAPORAN HARIAN WA SENDER*"];
-    if (counter.sheets && Object.keys(counter.sheets).length > 0) {
-        Object.keys(counter.sheets).forEach(sheetName => {
-            const s = counter.sheets[sheetName];
-            lines.push(`\n*Sheet: ${sheetName}*\n  ✅ Berhasil : ${s.success}\n  ❌ Gagal    : ${s.failed}`);
-        });
-        lines.push(`\n────────────────\n*Total*\n  ✅ Berhasil : ${counter.success}\n  ❌ Gagal    : ${counter.failed}`);
-    } else {
-        lines.push(`✅ Berhasil: ${counter.success}\n❌ Gagal: ${counter.failed}`);
-    }
-    _sendText(formatPhoneNumber(no), lines.join("\n"), apiKey);
+  if (!no) return;
+  let lines = ["*\u{1F4CB} LAPORAN HARIAN WA SENDER*"];
+  if (counter.sheets && Object.keys(counter.sheets).length > 0) {
+    Object.keys(counter.sheets).forEach(sheetName => {
+      const s = counter.sheets[sheetName];
+      lines.push(`\n*Sheet: ${sheetName}*\n  ✅ Berhasil : ${s.success}\n  ❌ Gagal    : ${s.failed}`);
+    });
+    lines.push(`\n────────────────\n*Total*\n  ✅ Berhasil : ${counter.success}\n  ❌ Gagal    : ${counter.failed}`);
+  } else {
+    lines.push(`✅ Berhasil: ${counter.success}\n❌ Gagal: ${counter.failed}`);
+  }
+  _sendText(formatPhoneNumber(no), lines.join("\n"), apiKey);
 }
 
 function _showResult(ui, counter) {
-    if (ui) ui.alert(`Proses Selesai!\nBerhasil: ${counter.success}\nGagal: ${counter.failed}`);
+  if (ui) ui.alert(`Proses Selesai!\nBerhasil: ${counter.success}\nGagal: ${counter.failed}`);
 }
 
 function formatPhoneNumber(phone) {
-    if (!phone) return null;
-    const d = phone.toString().replace(/\D/g, "");
-    if (!d) return null;
-    if (d.startsWith("62")) return d;
-    if (d.startsWith("0")) return "62" + d.slice(1);
-    return "62" + d;
+  if (!phone) return null;
+  const d = phone.toString().replace(/\D/g, "");
+  if (!d) return null;
+  if (d.startsWith("62")) return d;
+  if (d.startsWith("0")) return "62" + d.slice(1);
+  return "62" + d;
 }
