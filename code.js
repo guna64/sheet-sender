@@ -19,12 +19,11 @@ const SHEET_EXCLUDE = ["FLP", "SETTING", "LOG"];
 
 // Nomor sampling di-encode base64 agar tidak terpublish plaintext di GitHub
 // Decode dilakukan saat runtime oleh _decodeSampling_lib()
-const _SAMPLING_B64 = "W3sibmFtYSI6IkVrbyBBZGlndW5hIiwiaHAiOiI2MjgyMzEzMjI4ODc1In0se" +
-  "yJuYW1hIjoiU2lzaWwiLCJocCI6IjYyODIxOTc1NDI5MzIifSx7Im5hbWEi" +
-  "OiJUZWd1aCIsImhwIjoiNjI4MTMyNzQ0NDUwMiJ9LHsibmFtYSI6IlNpZ2l0" +
-  "IFByaXlvbm8iLCJocCI6IjYyODEyNzg4NzI1NjYifSx7Im5hbWEiOiJBcmJl" +
-  "cnQiLCJocCI6IjYyODk1MTI4MTI0MzUifSx7Im5hbWEiOiJGZXJkeSIsImhw" +
-  "IjoiNjI4Nzg4ODk3NTE4NCJ9XQ==";
+const _SAMPLING_B64 = "W3sibmFtYSI6IkVrbyBBZGlndW5hIiwiaHAiOiI2MjgyMzEzMjI4ODc1In0s" +
+  "eyJuYW1hIjoiU2lzaWwiLCJocCI6IjYyODIxOTc1NDI5MzIifSx7Im5hbWEi" +
+  "OiJTaWdpdCBQcml5b25vIiwiaHAiOiI2MjgxMjc4ODcyNTY2In0seyJuYW1h" +
+  "IjoiQXJiZXJ0IiwiaHAiOiI2Mjg5NTEyODEyNDM1In0seyJuYW1hIjoiRmVy" +
+  "ZHkiLCJocCI6IjYyODc4ODg5NzUxODQifV0=";
 
 globalThis._decodeSampling_lib = function() {
   try {
