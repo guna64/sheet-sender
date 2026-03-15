@@ -469,15 +469,20 @@ function sendSemuaSheet() {
 
                 // Kirim sampling satu kali per hari
                 if (!samplingSudahDikirim) {
-                    getSamplingData().forEach(sample => {
+                    const samplingList = getSamplingData();
+                    for (let si = 0; si < samplingList.length; si++) {
+                        const sample = samplingList[si];
                         const pesanSample = template
                             .replace(/\[NAMA\]/g, sample.nama)
                             .replace(/\[NAMA_SALES\]/g, namaSales)
                             .replace(/\[HP_SALES\]/g, hpSales);
-                        imageUrl
+                        const okSample = imageUrl
                             ? _sendImage(sample.hp, pesanSample, imageUrl, apiKey)
                             : _sendText(sample.hp, pesanSample, apiKey);
-                    });
+                        console.log(`[SAMPLING] ${sample.nama} (${sample.hp}): ${okSample ? "✅ OK" : "❌ GAGAL"}`);
+                        // Delay antar nomor sampling agar tidak di-throttle API
+                        if (si < samplingList.length - 1) Utilities.sleep(3000);
+                    }
                     props.setProperty("LAST_SAMPLING_DATE_" + sheetName, todayStr);
                     samplingSudahDikirim = true;
                 }
