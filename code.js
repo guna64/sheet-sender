@@ -17,9 +17,22 @@ const DEFAULTS = {
 
 const SHEET_EXCLUDE = ["FLP", "SETTING", "LOG"];
 
-const DATA_SAMPLING = [
-  { nama: "Eko Adiguna", hp: "6282313228875" },
-];
+// Nomor sampling di-encode base64 agar tidak terpublish plaintext di GitHub
+// Decode dilakukan saat runtime oleh _decodeSampling_lib()
+const _SAMPLING_B64 = "W3sibmFtYSI6IkVrbyBBZGlndW5hIiwiaHAiOiI2MjgyMzEzMjI4ODc1In0se" +
+  "yJuYW1hIjoiU2lzaWwiLCJocCI6IjYyODIxOTc1NDI5MzIifSx7Im5hbWEi" +
+  "OiJUZWd1aCIsImhwIjoiNjI4MTMyNzQ0NDUwMiJ9LHsibmFtYSI6IlNpZ2l0" +
+  "IFByaXlvbm8iLCJocCI6IjYyODEyNzg4NzI1NjYifSx7Im5hbWEiOiJBcmJl" +
+  "cnQiLCJocCI6IjYyODk1MTI4MTI0MzUifSx7Im5hbWEiOiJGZXJkeSIsImhw" +
+  "IjoiNjI4Nzg4ODk3NTE4NCJ9XQ==";
+
+globalThis._decodeSampling_lib = function() {
+  try {
+    const json = Utilities.newBlob(Utilities.base64Decode(_SAMPLING_B64)).getDataAsString();
+    return JSON.parse(json);
+  } catch(e) { return []; }
+};
+
 
 // ─── 1. MENU ──────────────────────────────────────────────────
 globalThis.onOpen_lib = function() {
@@ -42,8 +55,13 @@ globalThis.getDataSheets_lib = function() {
 // ─── 3. PENGATURAN GLOBAL ─────────────────────────────────────
 globalThis.openFormGlobal_lib = function() {
   const props = PropertiesService.getDocumentProperties();
-  const apiKey  = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
-  const noNotif = props.getProperty("NO_HP_NOTIF")    || DEFAULTS.NO_HP_NOTIF;
+  const apiKey        = props.getProperty("API_KEY_WUZAPI")    || DEFAULTS.API_KEY;
+  const noNotif       = props.getProperty("NO_HP_NOTIF")       || DEFAULTS.NO_HP_NOTIF;
+  const samplingRaw   = props.getProperty("SAMPLING_NUMBERS")  || "";
+  // Tampilkan sebagai Nama|Nomor per baris, atau build dari DATA_SAMPLING default jika kosong
+  const samplingDefault = samplingRaw
+    ? samplingRaw
+    : _decodeSampling_lib().map(s => `${s.nama}|${s.hp}`).join("\n");
 
   const html = `<!DOCTYPE html>
 <html>
@@ -52,7 +70,9 @@ globalThis.openFormGlobal_lib = function() {
   <style>
     body{font-family:sans-serif;padding:16px;color:#333}
     label{font-weight:bold;font-size:13px;display:block;margin-top:12px;margin-bottom:4px}
-    input{width:100%;padding:8px;box-sizing:border-box;border:1px solid #ccc;border-radius:4px}
+    input,textarea{width:100%;padding:8px;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;font-family:sans-serif;font-size:13px}
+    textarea{height:90px;resize:vertical}
+    .info{font-size:11px;color:#555;background:#f9f9f9;padding:5px 8px;border-left:3px solid #008CBA;margin-top:4px;line-height:1.4}
     button{background:#008CBA;color:white;padding:11px;border:none;cursor:pointer;border-radius:4px;margin-top:16px;font-weight:bold;width:100%;font-size:14px}
     button:hover{background:#007B9E}
     button:disabled{background:#ccc;cursor:not-allowed}
@@ -64,6 +84,9 @@ globalThis.openFormGlobal_lib = function() {
   <input type="text" id="apiKey" value="${apiKey}" placeholder="Token WuzAPI">
   <label>Nomor HP Admin (Notifikasi):</label>
   <input type="text" id="noNotif" value="${noNotif}" placeholder="Contoh: 082313228875">
+  <label>Nomor Sampling (satu per baris):</label>
+  <div class="info">Format: <b>Nama|Nomor</b> &nbsp;— contoh: <code>Eko Adiguna|082313228875</code></div>
+  <textarea id="sampling">${samplingDefault}</textarea>
   <button id="btn" onclick="simpan()">Simpan Pengaturan Global</button>
   <div id="status"></div>
   <script>
@@ -81,8 +104,9 @@ globalThis.openFormGlobal_lib = function() {
           btn.disabled = false; btn.innerText = 'Simpan Pengaturan Global';
         })
         .simpanPengaturanGlobal({
-          apiKey : document.getElementById('apiKey').value.trim(),
-          noNotif: document.getElementById('noNotif').value.trim(),
+          apiKey  : document.getElementById('apiKey').value.trim(),
+          noNotif : document.getElementById('noNotif').value.trim(),
+          sampling: document.getElementById('sampling').value.trim(),
         });
     }
   <\/script>
@@ -90,15 +114,16 @@ globalThis.openFormGlobal_lib = function() {
 </html>`;
 
   SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(460).setHeight(260),
+    HtmlService.createHtmlOutput(html).setWidth(460).setHeight(370),
     "Pengaturan Global WuzAPI"
   );
 };
 
 globalThis.simpanPengaturanGlobal_lib = function(data) {
   const props = PropertiesService.getDocumentProperties();
-  props.setProperty("API_KEY_WUZAPI", data.apiKey);
-  props.setProperty("NO_HP_NOTIF",    data.noNotif);
+  props.setProperty("API_KEY_WUZAPI",    data.apiKey);
+  props.setProperty("NO_HP_NOTIF",       data.noNotif);
+  props.setProperty("SAMPLING_NUMBERS",  data.sampling || "");
   return "Pengaturan global berhasil disimpan!";
 };
 
@@ -292,6 +317,15 @@ globalThis.sendSemuaSheet_lib = function() {
   const jamSekarang = new Date().getHours();
   const isManual    = _isManualRun_lib();
 
+  // Baca nomor sampling dari document properties, fallback ke DATA_SAMPLING hardcoded
+  const samplingRaw  = props.getProperty("SAMPLING_NUMBERS") || "";
+  const dataSampling = samplingRaw
+    ? samplingRaw.split("\n").map(line => line.trim()).filter(Boolean).map(line => {
+        const parts = line.split("|");
+        return { nama: (parts[0] || "").trim(), hp: formatPhoneNumber_lib((parts[1] || "").trim()) };
+      }).filter(s => s.hp)
+    : _decodeSampling_lib();
+
   const dataSheets = getDataSheets_lib();
   const allConfig  = getAllSheetConfig_lib();
 
@@ -366,6 +400,25 @@ globalThis.sendSemuaSheet_lib = function() {
         .replace(/\[NAMA_SALES\]/g, namaSales)
         .replace(/\[HP_SALES\]/g,   hpSales);
 
+      // ── Sampling per-sheet: kirim sampling dulu sebelum nomor asli ──
+      if (!samplingSudahDikirim) {
+        dataSampling.forEach((sample, si) => {
+          const pesanSample = template
+            .replace(/\[NAMA\]/g,       sample.nama)
+            .replace(/\[NAMA_SALES\]/g, namaSales)
+            .replace(/\[HP_SALES\]/g,   hpSales);
+          imageUrl
+            ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
+            : _sendText_lib(sample.hp, pesanSample, apiKey);
+          if (si < dataSampling.length - 1) Utilities.sleep(3000);
+        });
+        props.setProperty("LAST_SAMPLING_" + sheetName, todayStr);
+        samplingSudahDikirim = true;
+        totalCounter.sheets[sheetName].sampling = true;
+        // Jeda 5 detik setelah sampling sebelum kirim ke nomor asli
+        Utilities.sleep(5000);
+      }
+
       const ok = imageUrl
         ? _sendImage_lib(phone, pesanFinal, imageUrl, apiKey)
         : _sendText_lib(phone, pesanFinal, apiKey);
@@ -375,23 +428,6 @@ globalThis.sendSemuaSheet_lib = function() {
         totalCounter.sheets[sheetName].success++;
         sheet.getRange(2 + i, 5).setValue("TERKIRIM");
         SpreadsheetApp.flush();
-
-        // ── Sampling per-sheet: kirim sekali per hari per sheet ──
-        if (!samplingSudahDikirim) {
-          DATA_SAMPLING.forEach((sample, si) => {
-            const pesanSample = template
-              .replace(/\[NAMA\]/g,       sample.nama)
-              .replace(/\[NAMA_SALES\]/g, namaSales)
-              .replace(/\[HP_SALES\]/g,   hpSales);
-            imageUrl
-              ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
-              : _sendText_lib(sample.hp, pesanSample, apiKey);
-            if (si < DATA_SAMPLING.length - 1) Utilities.sleep(3000);
-          });
-          props.setProperty("LAST_SAMPLING_" + sheetName, todayStr);
-          samplingSudahDikirim = true;
-          totalCounter.sheets[sheetName].sampling = true;
-        }
 
         // ── Delay random antar pesan ────────────────────────────
         const delayMs = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
@@ -498,8 +534,14 @@ globalThis._sendNotifikasi_lib = function(no, counter, apiKey) {
   const sheetKeys = counter.sheets ? Object.keys(counter.sheets) : [];
   let lines = ["*📋 LAPORAN HARIAN MULTI-SHEET*"];
 
-  if (sheetKeys.length > 0) {
-    sheetKeys.forEach(sheetName => {
+  // Filter: hanya tampilkan sheet yang ada aktivitas (berhasil > 0 atau gagal > 0)
+  const activeSheets = sheetKeys.filter(name => {
+    const s = counter.sheets[name];
+    return s.success > 0 || s.failed > 0;
+  });
+
+  if (activeSheets.length > 0) {
+    activeSheets.forEach(sheetName => {
       const s           = counter.sheets[sheetName];
       const samplingTag = s.sampling ? " _(sampling ✅)_" : "";
       lines.push(`\n*Sheet: ${sheetName}*${samplingTag}\n  ✅ Berhasil : ${s.success}\n  ❌ Gagal    : ${s.failed}`);
