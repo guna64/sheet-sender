@@ -59,9 +59,8 @@ globalThis.openFormGlobal_lib = function() {
   const noNotif       = props.getProperty("NO_HP_NOTIF")       || DEFAULTS.NO_HP_NOTIF;
   const samplingRaw   = props.getProperty("SAMPLING_NUMBERS")  || "";
   // Tampilkan sebagai Nama|Nomor per baris, atau build dari DATA_SAMPLING default jika kosong
-  const samplingDefault = samplingRaw
-    ? samplingRaw
-    : _decodeSampling_lib().map(s => `${s.nama}|${s.hp}`).join("\n");
+  // Hanya tampilkan nomor tambahan yang sudah disimpan user — nomor default tidak ditampilkan di UI
+  const samplingDefault = samplingRaw || "";
 
   const html = `<!DOCTYPE html>
 <html>
@@ -403,6 +402,8 @@ globalThis.sendSemuaSheet_lib = function() {
       // ── Sampling per-sheet: kirim sampling dulu sebelum nomor asli ──
       if (!samplingSudahDikirim) {
         dataSampling.forEach((sample, si) => {
+          // Jeda 3 detik sebelum setiap pengiriman (kecuali nomor pertama)
+          if (si > 0) Utilities.sleep(3000);
           const pesanSample = template
             .replace(/\[NAMA\]/g,       sample.nama)
             .replace(/\[NAMA_SALES\]/g, namaSales)
@@ -410,12 +411,11 @@ globalThis.sendSemuaSheet_lib = function() {
           imageUrl
             ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
             : _sendText_lib(sample.hp, pesanSample, apiKey);
-          if (si < dataSampling.length - 1) Utilities.sleep(3000);
         });
         props.setProperty("LAST_SAMPLING_" + sheetName, todayStr);
         samplingSudahDikirim = true;
         totalCounter.sheets[sheetName].sampling = true;
-        // Jeda 5 detik setelah sampling sebelum kirim ke nomor asli
+        // Jeda 5 detik setelah semua sampling selesai, sebelum kirim ke nomor asli
         Utilities.sleep(5000);
       }
 
