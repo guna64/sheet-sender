@@ -1,7 +1,7 @@
 // ============================================================
 //  WA SHEET SENDER — LIBRARY
 //  Upload file ini ke GitHub repo: guna64/sheet-sender
-//  Semua fungsi pakai suffix _lib agar tidak konflik
+//  Semua fungsi di-assign ke globalThis agar eval() bisa expose ke scope global GAS
 // ============================================================
 
 const DEFAULTS = {
@@ -22,25 +22,25 @@ const DATA_SAMPLING = [
 ];
 
 // ─── 1. MENU ──────────────────────────────────────────────────
-function onOpen_lib() {
+globalThis.onOpen_lib = function() {
   SpreadsheetApp.getUi()
     .createMenu("⚙️ Setting WA")
     .addItem("⚙️ Pengaturan Global",         "openFormGlobal")
     .addItem("📋 Pengaturan Per Sheet",       "openFormPerSheet")
     .addItem("🚀 Kirim Semua Sheet Hari Ini", "sendSemuaSheet")
     .addToUi();
-}
+};
 
 // ─── 2. DAFTAR SHEET ──────────────────────────────────────────
-function getDataSheets_lib() {
+globalThis.getDataSheets_lib = function() {
   return SpreadsheetApp.getActiveSpreadsheet()
     .getSheets()
     .filter(s => !SHEET_EXCLUDE.includes(s.getName()))
     .map(s => s.getName());
-}
+};
 
 // ─── 3. PENGATURAN GLOBAL ─────────────────────────────────────
-function openFormGlobal_lib() {
+globalThis.openFormGlobal_lib = function() {
   const props   = PropertiesService.getDocumentProperties();
   const apiKey  = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
   const noNotif = props.getProperty("NO_HP_NOTIF")    || DEFAULTS.NO_HP_NOTIF;
@@ -93,17 +93,17 @@ function openFormGlobal_lib() {
     HtmlService.createHtmlOutput(html).setWidth(460).setHeight(260),
     "Pengaturan Global WuzAPI"
   );
-}
+};
 
-function simpanPengaturanGlobal_lib(data) {
+globalThis.simpanPengaturanGlobal_lib = function(data) {
   const props = PropertiesService.getDocumentProperties();
   props.setProperty("API_KEY_WUZAPI", data.apiKey);
   props.setProperty("NO_HP_NOTIF",    data.noNotif);
   return "Pengaturan global berhasil disimpan!";
-}
+};
 
 // ─── 4. PENGATURAN PER SHEET ──────────────────────────────────
-function openFormPerSheet_lib() {
+globalThis.openFormPerSheet_lib = function() {
   const daftarSheet     = JSON.stringify(getDataSheets_lib());
   const allConfig       = JSON.stringify(getAllSheetConfig_lib());
   const defaultPesan    = DEFAULTS.TEMPLATE_PESAN.replace(/'/g, "\\'");
@@ -248,9 +248,9 @@ function openFormPerSheet_lib() {
     HtmlService.createHtmlOutput(html).setWidth(520).setHeight(700),
     "Pengaturan Pesan Per Sheet"
   );
-}
+};
 
-function getAllSheetConfig_lib() {
+globalThis.getAllSheetConfig_lib = function() {
   const props  = PropertiesService.getDocumentProperties();
   const sheets = getDataSheets_lib();
   const result = {};
@@ -266,9 +266,9 @@ function getAllSheetConfig_lib() {
     };
   });
   return result;
-}
+};
 
-function simpanKonfigurasiSheet_lib(dataJson) {
+globalThis.simpanKonfigurasiSheet_lib = function(dataJson) {
   const props  = PropertiesService.getDocumentProperties();
   const config = JSON.parse(dataJson);
   Object.keys(config).forEach(name => {
@@ -276,10 +276,10 @@ function simpanKonfigurasiSheet_lib(dataJson) {
   });
   setupTriggerHarian_lib();
   return "Konfigurasi per sheet berhasil disimpan!";
-}
+};
 
 // ─── 5. KIRIM SEMUA SHEET ─────────────────────────────────────
-function sendSemuaSheet_lib() {
+globalThis.sendSemuaSheet_lib = function() {
   const startTime   = new Date().getTime();
   const props       = PropertiesService.getDocumentProperties();
   const apiKey      = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
@@ -416,14 +416,14 @@ function sendSemuaSheet_lib() {
   } else if (ui) {
     ui.alert("Tidak ada sheet yang dijadwalkan pada jam " + jamSekarang + ":00");
   }
-}
+};
 
-function _isManualRun_lib() {
+globalThis._isManualRun_lib = function() {
   try { SpreadsheetApp.getUi(); return true; } catch(e) { return false; }
-}
+};
 
 // ─── 6. TRIGGER ───────────────────────────────────────────────
-function setupTriggerHarian_lib() {
+globalThis.setupTriggerHarian_lib = function() {
   _deleteAllTriggers_lib();
   const allConfig      = getAllSheetConfig_lib();
   const jamSudahDibuat = new Set();
@@ -435,50 +435,52 @@ function setupTriggerHarian_lib() {
     ScriptApp.newTrigger("sendSemuaSheet").timeBased().atHour(jam).everyDays(1).create();
     jamSudahDibuat.add(jam);
   });
-}
+};
 
-function _createResumptionTrigger_lib() {
+globalThis._createResumptionTrigger_lib = function() {
   _deleteAllTriggers_lib();
   ScriptApp.newTrigger("sendSemuaSheet").timeBased().after(60000).create();
-}
+};
 
-function _deleteAllTriggers_lib() {
+globalThis._deleteAllTriggers_lib = function() {
   ScriptApp.getProjectTriggers().forEach(t => {
     if (t.getHandlerFunction() === "sendSemuaSheet") ScriptApp.deleteTrigger(t);
   });
-}
+};
 
 // ─── 7. HELPERS ───────────────────────────────────────────────
-function _getUi_lib() { try { return SpreadsheetApp.getUi(); } catch(e) { return null; } }
+globalThis._getUi_lib = function() {
+  try { return SpreadsheetApp.getUi(); } catch(e) { return null; }
+};
 
-function _buildSalesMap_lib(sheet) {
+globalThis._buildSalesMap_lib = function(sheet) {
   const map = {};
   sheet.getRange("A:B").getValues().forEach(([n, p]) => {
     if (n) map[n.toString().trim()] = p.toString().trim();
   });
   return map;
-}
+};
 
-function _getSheetData_lib(sheet) {
+globalThis._getSheetData_lib = function(sheet) {
   const last = sheet.getLastRow();
   return last < 2 ? [] : sheet.getRange(2, 1, last - 1, 5).getValues();
-}
+};
 
-function _formatTanggal_lib(raw, tz) {
+globalThis._formatTanggal_lib = function(raw, tz) {
   return (raw instanceof Date)
     ? Utilities.formatDate(raw, tz, "dd/MM/yyyy")
     : (raw ? raw.toString().trim() : "");
-}
+};
 
-function _sendText_lib(phone, body, apiKey) {
+globalThis._sendText_lib = function(phone, body, apiKey) {
   return _callApi_lib(DEFAULTS.API_URL_TEXT, { Phone: phone, Body: body }, apiKey);
-}
+};
 
-function _sendImage_lib(phone, caption, imageUrl, apiKey) {
+globalThis._sendImage_lib = function(phone, caption, imageUrl, apiKey) {
   return _callApi_lib(DEFAULTS.API_URL_IMAGE, { Phone: phone, Caption: caption, Image: imageUrl }, apiKey);
-}
+};
 
-function _callApi_lib(url, payload, apiKey) {
+globalThis._callApi_lib = function(url, payload, apiKey) {
   try {
     const res = UrlFetchApp.fetch(url, {
       method            : "post",
@@ -489,9 +491,9 @@ function _callApi_lib(url, payload, apiKey) {
     });
     return res.getResponseCode() === 200 || res.getResponseCode() === 201;
   } catch(e) { return false; }
-}
+};
 
-function _sendNotifikasi_lib(no, counter, apiKey) {
+globalThis._sendNotifikasi_lib = function(no, counter, apiKey) {
   if (!no) return;
   const sheetKeys = counter.sheets ? Object.keys(counter.sheets) : [];
   let lines = ["*📋 LAPORAN HARIAN MULTI-SHEET*"];
@@ -508,16 +510,16 @@ function _sendNotifikasi_lib(no, counter, apiKey) {
   }
 
   _sendText_lib(formatPhoneNumber_lib(no), lines.join("\n"), apiKey);
-}
+};
 
-function _showResult_lib(ui, counter) {
+globalThis._showResult_lib = function(ui, counter) {
   if (ui) ui.alert(`Proses Selesai!\nBerhasil: ${counter.success}\nGagal: ${counter.failed}`);
-}
+};
 
-function formatPhoneNumber_lib(phone) {
+globalThis.formatPhoneNumber_lib = function(phone) {
   if (!phone) return null;
   const d = phone.toString().replace(/\D/g, "");
   if (d.startsWith("62")) return d;
   if (d.startsWith("0"))  return "62" + d.slice(1);
   return "62" + d;
-}
+};
