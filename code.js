@@ -4,7 +4,7 @@
 //  Semua fungsi di-assign ke globalThis agar eval() bisa expose ke scope global GAS
 // ============================================================
 
-const VERSION = "v2.0.1";
+const VERSION = "v2.0.3";
 
 const DEFAULTS = {
   API_KEY      : "H7XXCRM",
