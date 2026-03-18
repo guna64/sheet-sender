@@ -8,8 +8,8 @@ const DEFAULTS = {
   API_KEY      : "H7XXCRM",
   NO_HP_NOTIF  : "082313228875",
   JAM_TRIGGER  : "8",
-  DELAY_MIN    : "20",
-  DELAY_MAX    : "60",
+  DELAY_MIN    : "5",   // detik — dikurangi agar lebih banyak pesan per eksekusi 5 menit
+  DELAY_MAX    : "15",  // detik — maks 15 detik, cukup aman dari spam filter WA
   API_URL_TEXT : "https://wuzapi.aza.biz.id/chat/send/text",
   API_URL_IMAGE: "https://wuzapi.aza.biz.id/chat/send/image",
   TEMPLATE_PESAN: "Halo [NAMA], kami ada penawaran spesial untuk Anda. Hubungi [NAMA_SALES] di [HP_SALES].",
@@ -40,7 +40,31 @@ globalThis.onOpen_lib = function() {
     .addItem("⚙️ Pengaturan Global",         "openFormGlobal")
     .addItem("📋 Pengaturan Per Sheet",       "openFormPerSheet")
     .addItem("🚀 Kirim Semua Sheet Hari Ini", "sendSemuaSheet")
+    .addSeparator()
+    .addItem("🔄 Reset Data Sampling",        "resetDataSampling")
     .addToUi();
+};
+
+// ─── 1b. RESET DATA SAMPLING ─────────────────────────────────
+// Hapus semua key LAST_SAMPLING_* agar sampling bisa dikirim ulang (untuk uji coba)
+globalThis.resetDataSampling_lib = function() {
+  const props    = PropertiesService.getDocumentProperties();
+  const allProps = props.getProperties();
+  const reset    = [];
+
+  // Hapus SEMUA key yang diawali LAST_SAMPLING_ tanpa filter nama sheet
+  Object.keys(allProps).forEach(key => {
+    if (key.startsWith("LAST_SAMPLING_")) {
+      props.deleteProperty(key);
+      reset.push(key.replace("LAST_SAMPLING_", ""));
+    }
+  });
+
+  const ui  = SpreadsheetApp.getUi();
+  const msg = reset.length > 0
+    ? "✅ Sampling direset untuk " + reset.length + " sheet:\n• " + reset.join("\n• ")
+    : "ℹ️ Tidak ada data sampling yang perlu direset.";
+  ui.alert("Reset Data Sampling", msg, ui.ButtonSet.OK);
 };
 
 // ─── 2. DAFTAR SHEET ──────────────────────────────────────────
@@ -343,7 +367,11 @@ globalThis.sendSemuaSheet_lib = function() {
     if (!cfg.aktif) continue;
 
     const jamSheet = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
-    if (!isManual && jamSheet !== jamSekarang) continue;
+
+    // Jika sedang resume untuk sheet ini, lewati cek jam
+    // (trigger bisa fire di jam berbeda jika proses dimulai misal 18:45 → resume 19:03)
+    const isResumingThisSheet = skipUntilResume && resumeState.sheetName === sheetName;
+    if (!isManual && !isResumingThisSheet && jamSheet !== jamSekarang) continue;
 
     if (skipUntilResume && resumeState.sheetName !== sheetName) continue;
 
@@ -383,7 +411,8 @@ globalThis.sendSemuaSheet_lib = function() {
       }
     }
 
-    // ── SAMPLING: Kirim sampling jika ada data hari ini dan belum pernah kirim hari ini ──
+    // ── SAMPLING: Kirim sampling per-sheet (key: LAST_SAMPLING_{sheetName})
+    // Masing-masing sheet (pagi/siang/sore) punya tracker sendiri → sample dapat 3 pesan berbeda
     if (adaDataHariIni) {
       const lastSamplingSheet = props.getProperty("LAST_SAMPLING_" + sheetName);
       const samplingSudahDikirim = (lastSamplingSheet === todayStr);
