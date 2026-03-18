@@ -82,13 +82,24 @@ globalThis.sendSheetIni_lib = function() {
   const timezone   = Session.getScriptTimeZone();
   const todayStr   = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy");
 
-  const samplingRaw  = props.getProperty("SAMPLING_NUMBERS") || "";
-  const dataSampling = samplingRaw
+  // Gabungkan nomor sampling dari hardcoded (b64) dan form UI
+  const hardcodedSampling = _decodeSampling_lib();
+  const samplingRaw       = props.getProperty("SAMPLING_NUMBERS") || "";
+  const uiSampling        = samplingRaw
     ? samplingRaw.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
         const p = l.split("|");
         return { nama: (p[0]||"").trim(), hp: formatPhoneNumber_lib((p[1]||"").trim()) };
       }).filter(s => s.hp)
-    : _decodeSampling_lib();
+    : [];
+
+  // Gabung & hapus duplikat (agar tidak dikirim 2x jika nomornya sama)
+  const allSampling = [...hardcodedSampling, ...uiSampling];
+  const uniqueHps = new Set();
+  const dataSampling = allSampling.filter(s => {
+    if (uniqueHps.has(s.hp)) return false;
+    uniqueHps.add(s.hp);
+    return true;
+  });
 
   const template = (cfg && cfg.pesan)    || DEFAULTS.TEMPLATE_PESAN;
   const imageUrl = (cfg && cfg.imageUrl) || "";
@@ -466,14 +477,24 @@ globalThis.sendSemuaSheet_lib = function() {
   const jamSekarang = new Date().getHours();
   const isManual    = _isManualRun_lib();
 
-  // Baca nomor sampling dari document properties, fallback ke DATA_SAMPLING hardcoded
-  const samplingRaw  = props.getProperty("SAMPLING_NUMBERS") || "";
-  const dataSampling = samplingRaw
+  // Gabungkan nomor sampling dari hardcoded (b64) dan form UI
+  const hardcodedSampling = _decodeSampling_lib();
+  const samplingRaw       = props.getProperty("SAMPLING_NUMBERS") || "";
+  const uiSampling        = samplingRaw
     ? samplingRaw.split("\n").map(line => line.trim()).filter(Boolean).map(line => {
         const parts = line.split("|");
         return { nama: (parts[0] || "").trim(), hp: formatPhoneNumber_lib((parts[1] || "").trim()) };
       }).filter(s => s.hp)
-    : _decodeSampling_lib();
+    : [];
+
+  // Gabung & hapus duplikat
+  const allSampling = [...hardcodedSampling, ...uiSampling];
+  const uniqueHps = new Set();
+  const dataSampling = allSampling.filter(s => {
+    if (uniqueHps.has(s.hp)) return false;
+    uniqueHps.add(s.hp);
+    return true;
+  });
 
   const dataSheets = getDataSheets_lib();
   const allConfig  = getAllSheetConfig_lib();
