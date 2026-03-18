@@ -357,10 +357,6 @@ globalThis.sendSemuaSheet_lib = function() {
       totalCounter.sheets[sheetName] = { success: 0, failed: 0, sampling: false };
     }
 
-    // ── Sampling per-sheet: cek apakah sheet ini sudah kirim sampling hari ini ──
-    const lastSamplingSheet    = props.getProperty("LAST_SAMPLING_" + sheetName);
-    let   samplingSudahDikirim = (lastSamplingSheet === todayStr);
-
     const rows     = _getSheetData_lib(sheet);
     const template = cfg.pesan    || DEFAULTS.TEMPLATE_PESAN;
     const imageUrl = cfg.imageUrl || "";
@@ -370,6 +366,47 @@ globalThis.sendSemuaSheet_lib = function() {
     const startRow = (skipUntilResume && resumeState.sheetName === sheetName)
       ? resumeState.rowIndex : 0;
     skipUntilResume = false;
+
+    // ── CEK: Apakah ada data untuk hari ini di sheet ini? ──
+    let adaDataHariIni = false;
+    let firstNamaSales = "";
+    
+    for (let checkIdx = startRow; checkIdx < rows.length; checkIdx++) {
+      const checkRow = rows[checkIdx];
+      const checkTanggal = _formatTanggal_lib(checkRow[0], timezone);
+      const checkStatus = checkRow[4] ? checkRow[4].toString().trim().toUpperCase() : "";
+      
+      if (checkTanggal === todayStr && checkRow[2] && checkStatus !== "TERKIRIM") {
+        adaDataHariIni = true;
+        firstNamaSales = checkRow[3] ? checkRow[3].toString().trim() : "";
+        break;
+      }
+    }
+
+    // ── SAMPLING: Kirim sampling jika ada data hari ini dan belum pernah kirim hari ini ──
+    if (adaDataHariIni) {
+      const lastSamplingSheet = props.getProperty("LAST_SAMPLING_" + sheetName);
+      const samplingSudahDikirim = (lastSamplingSheet === todayStr);
+      
+      if (!samplingSudahDikirim) {
+        const hpSales = mapSales[firstNamaSales] || "-";
+        
+        dataSampling.forEach((sample, si) => {
+          if (si > 0) Utilities.sleep(3000);
+          const pesanSample = template
+            .replace(/\[NAMA\]/g,       sample.nama)
+            .replace(/\[NAMA_SALES\]/g, firstNamaSales)
+            .replace(/\[HP_SALES\]/g,   hpSales);
+          imageUrl
+            ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
+            : _sendText_lib(sample.hp, pesanSample, apiKey);
+        });
+        
+        props.setProperty("LAST_SAMPLING_" + sheetName, todayStr);
+        totalCounter.sheets[sheetName].sampling = true;
+        Utilities.sleep(5000);
+      }
+    }
 
     for (let i = startRow; i < rows.length; i++) {
 
@@ -397,26 +434,6 @@ globalThis.sendSemuaSheet_lib = function() {
         .replace(/\[NAMA\]/g,       namaKonsumen)
         .replace(/\[NAMA_SALES\]/g, namaSales)
         .replace(/\[HP_SALES\]/g,   hpSales);
-
-      // ── Sampling per-sheet: kirim sampling dulu sebelum nomor asli ──
-      if (!samplingSudahDikirim) {
-        dataSampling.forEach((sample, si) => {
-          // Jeda 3 detik sebelum setiap pengiriman (kecuali nomor pertama)
-          if (si > 0) Utilities.sleep(3000);
-          const pesanSample = template
-            .replace(/\[NAMA\]/g,       sample.nama)
-            .replace(/\[NAMA_SALES\]/g, namaSales)
-            .replace(/\[HP_SALES\]/g,   hpSales);
-          imageUrl
-            ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
-            : _sendText_lib(sample.hp, pesanSample, apiKey);
-        });
-        props.setProperty("LAST_SAMPLING_" + sheetName, todayStr);
-        samplingSudahDikirim = true;
-        totalCounter.sheets[sheetName].sampling = true;
-        // Jeda 5 detik setelah semua sampling selesai, sebelum kirim ke nomor asli
-        Utilities.sleep(5000);
-      }
 
       const ok = imageUrl
         ? _sendImage_lib(phone, pesanFinal, imageUrl, apiKey)
