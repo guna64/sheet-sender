@@ -37,15 +37,142 @@ globalThis._decodeSampling_lib = function() {
 globalThis.onOpen_lib = function() {
   SpreadsheetApp.getUi()
     .createMenu("⚙️ Setting WA")
-    .addItem("⚙️ Pengaturan Global",         "openFormGlobal")
-    .addItem("📋 Pengaturan Per Sheet",       "openFormPerSheet")
-    .addItem("🚀 Kirim Semua Sheet Hari Ini", "sendSemuaSheet")
+    .addItem("⚙️ Pengaturan Global",           "openFormGlobal")
+    .addItem("📋 Pengaturan Per Sheet",         "openFormPerSheet")
     .addSeparator()
-    .addItem("🔄 Reset Data Sampling",        "resetDataSampling")
+    .addItem("🚀 Kirim Semua Sheet Hari Ini",   "sendSemuaSheet")
+    .addItem("📤 Kirim Sheet Ini Sekarang",     "sendSheetIni")
+    .addSeparator()
+    .addItem("🔄 Reset Data Sampling",          "resetDataSampling")
     .addToUi();
 };
 
-// ─── 1b. RESET DATA SAMPLING ─────────────────────────────────
+// ─── 1b. KIRIM SHEET INI SEKARANG ───────────────────────────
+// Hanya kirim untuk sheet yang sedang aktif/dipilih, tanpa cek jam
+globalThis.sendSheetIni_lib = function() {
+  const startTime  = new Date().getTime();
+  const props      = PropertiesService.getDocumentProperties();
+  const apiKey     = props.getProperty("API_KEY_WUZAPI") || DEFAULTS.API_KEY;
+  const noHpNotif  = props.getProperty("NO_HP_NOTIF")    || "";
+  const ss         = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet      = ss.getActiveSheet();
+  const sheetName  = sheet.getName();
+
+  // Tolak jika sheet adalah sheet sistem
+  if (SHEET_EXCLUDE.includes(sheetName)) {
+    SpreadsheetApp.getUi().alert("⚠️ Sheet '" + sheetName + "' adalah sheet sistem dan tidak bisa dikirim.");
+    return;
+  }
+
+  const allConfig = getAllSheetConfig_lib();
+  const cfg       = allConfig[sheetName];
+
+  if (!cfg || cfg.aktif !== true) {
+    const ui = SpreadsheetApp.getUi();
+    const resp = ui.alert(
+      "Sheet Tidak Aktif",
+      "Sheet '" + sheetName + "' saat ini tidak aktif.\nTetap kirim sekarang?",
+      ui.ButtonSet.YES_NO
+    );
+    if (resp !== ui.Button.YES) return;
+  }
+
+  const sheetFLP   = ss.getSheetByName("FLP");
+  const mapSales   = sheetFLP ? _buildSalesMap_lib(sheetFLP) : {};
+  const timezone   = Session.getScriptTimeZone();
+  const todayStr   = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy");
+
+  const samplingRaw  = props.getProperty("SAMPLING_NUMBERS") || "";
+  const dataSampling = samplingRaw
+    ? samplingRaw.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+        const p = l.split("|");
+        return { nama: (p[0]||"").trim(), hp: formatPhoneNumber_lib((p[1]||"").trim()) };
+      }).filter(s => s.hp)
+    : _decodeSampling_lib();
+
+  const template = (cfg && cfg.pesan)    || DEFAULTS.TEMPLATE_PESAN;
+  const imageUrl = (cfg && cfg.imageUrl) || "";
+  const delayMin = ((cfg && parseInt(cfg.delayMin)) || parseInt(DEFAULTS.DELAY_MIN)) * 1000;
+  const delayMax = ((cfg && parseInt(cfg.delayMax)) || parseInt(DEFAULTS.DELAY_MAX)) * 1000;
+
+  const counter  = { success: 0, failed: 0 };
+  const rows     = _getSheetData_lib(sheet);
+
+  // ── SAMPLING untuk sheet ini ─────────────────────────────────
+  let adaDataHariIni = false;
+  let firstNamaSales = "";
+  for (let ci = 0; ci < rows.length; ci++) {
+    const r = rows[ci];
+    if (_formatTanggal_lib(r[0], timezone) === todayStr && r[2] && r[4]?.toString().trim().toUpperCase() !== "TERKIRIM") {
+      adaDataHariIni = true;
+      firstNamaSales = r[3] ? r[3].toString().trim() : "";
+      break;
+    }
+  }
+
+  if (adaDataHariIni) {
+    const lastSampling = props.getProperty("LAST_SAMPLING_" + sheetName);
+    if (lastSampling !== todayStr) {
+      const hpSales = mapSales[firstNamaSales] || "-";
+      dataSampling.forEach((sample, si) => {
+        if (si > 0) Utilities.sleep(3000);
+        const pesanSample = template
+          .replace(/\[NAMA\]/g,       sample.nama)
+          .replace(/\[NAMA_SALES\]/g, firstNamaSales)
+          .replace(/\[HP_SALES\]/g,   hpSales);
+        imageUrl
+          ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
+          : _sendText_lib(sample.hp, pesanSample, apiKey);
+      });
+      props.setProperty("LAST_SAMPLING_" + sheetName, todayStr);
+      Utilities.sleep(5000);
+    }
+  }
+
+  // ── Kirim ke semua kontak di sheet ini ─────────────────────
+  for (let i = 0; i < rows.length; i++) {
+    // Safety: stop jika mendekati 5 menit
+    if (new Date().getTime() - startTime > 270000) {
+      SpreadsheetApp.getUi().alert("⏱️ Waktu habis! Baru terkirim " + counter.success + " pesan.\nJalankan ulang untuk melanjutkan.");
+      break;
+    }
+
+    const row         = rows[i];
+    const tanggalStr  = _formatTanggal_lib(row[0], timezone);
+    const namaKonsumen= row[1] ? row[1].toString().trim() : "";
+    const noHP        = row[2] ? row[2].toString().trim() : "";
+    const namaSales   = row[3] ? row[3].toString().trim() : "";
+    const statusKirim = row[4] ? row[4].toString().trim().toUpperCase() : "";
+
+    if (tanggalStr !== todayStr || !noHP || statusKirim === "TERKIRIM") continue;
+
+    const phone      = formatPhoneNumber_lib(noHP);
+    const hpSales    = mapSales[namaSales] || "-";
+    const pesanFinal = template
+      .replace(/\[NAMA\]/g,       namaKonsumen)
+      .replace(/\[NAMA_SALES\]/g, namaSales)
+      .replace(/\[HP_SALES\]/g,   hpSales);
+
+    const ok = imageUrl
+      ? _sendImage_lib(phone, pesanFinal, imageUrl, apiKey)
+      : _sendText_lib(phone, pesanFinal, apiKey);
+
+    if (ok) {
+      counter.success++;
+      sheet.getRange(2 + i, 5).setValue("TERKIRIM");
+      SpreadsheetApp.flush();
+      const delayMs = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
+      Utilities.sleep(delayMs);
+    } else {
+      counter.failed++;
+    }
+  }
+
+  _sendNotifikasi_lib(noHpNotif, { success: counter.success, failed: counter.failed, sheets: { [sheetName]: { success: counter.success, failed: counter.failed, sampling: adaDataHariIni } } }, apiKey);
+  SpreadsheetApp.getUi().alert("✅ Selesai!\nSheet: " + sheetName + "\nBerhasil: " + counter.success + "\nGagal: " + counter.failed);
+};
+
+// ─── 1c. RESET DATA SAMPLING ─────────────────────────────────
 // Hapus semua key LAST_SAMPLING_* agar sampling bisa dikirim ulang (untuk uji coba)
 globalThis.resetDataSampling_lib = function() {
   const props    = PropertiesService.getDocumentProperties();
@@ -363,8 +490,10 @@ globalThis.sendSemuaSheet_lib = function() {
   let   adaYangDiproses = false;
 
   for (const sheetName of dataSheets) {
-    const cfg = allConfig[sheetName] || {};
-    if (!cfg.aktif) continue;
+    const cfg = allConfig[sheetName];
+
+    // Hanya proses sheet yang AKTIF (strict check — false/undefined = skip)
+    if (!cfg || cfg.aktif !== true) continue;
 
     const jamSheet = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
 
@@ -736,3 +865,5 @@ globalThis._autoSetupTriggerSheetSender_lib = function() {
 // Alias untuk global scope
 globalThis.kirimRingkasanHarianSheetSender = globalThis.kirimRingkasanHarianSheetSender_lib;
 globalThis._autoSetupTriggerSheetSender = globalThis._autoSetupTriggerSheetSender_lib;
+globalThis.resetDataSampling = globalThis.resetDataSampling_lib;
+globalThis.sendSheetIni = globalThis.sendSheetIni_lib;
