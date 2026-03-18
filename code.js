@@ -564,3 +564,129 @@ globalThis.formatPhoneNumber_lib = function(phone) {
   if (d.startsWith("0"))  return "62" + d.slice(1);
   return "62" + d;
 };
+
+// ============================================================
+//  TELEGRAM TOPIC REPORT & AUTO TRIGGER (Tambahan 18 Maret 2026)
+// ============================================================
+
+// Config Telegram Topic - Report Brodcast Central
+const TG_BOT_TOKEN = "8737690023:AAGz60NDz_-v6ASJabAqWrxy65aYT4XP1fY";
+const TG_CHAT_ID = "-1002538753378";
+const TG_TOPIC_ID = "5252";
+
+/**
+ * Kirim laporan ke Telegram Topic
+ */
+globalThis.kirimRingkasanHarianSheetSender_lib = function() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const allSheets = ss.getSheets();
+  const props = PropertiesService.getDocumentProperties();
+  const allConfig = {};
+  
+  // Ambil config per sheet
+  allSheets.forEach(sheet => {
+    const cfgJson = props.getProperty("CFG_" + sheet.getName());
+    if (cfgJson) {
+      try { allConfig[sheet.getName()] = JSON.parse(cfgJson); } catch(e) {}
+    }
+  });
+  
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  let totalTerkirim = 0;
+  let totalCabangAktif = 0;
+  let detailCabang = [];
+  
+  for (const sheet of allSheets) {
+    const sheetName = sheet.getName();
+    if (SHEET_EXCLUDE.indexOf(sheetName) > -1) continue;
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) continue;
+    
+    // Cek kolom status (kolom E = 5)
+    const statusValues = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
+    let terkirimCount = 0;
+    
+    for (let i = 0; i < statusValues.length; i++) {
+      const status = statusValues[i][0] ? statusValues[i][0].toString().trim() : "";
+      if (status === "TERKIRIM" || status === "✅") terkirimCount++;
+    }
+    
+    if (terkirimCount > 0) {
+      totalTerkirim += terkirimCount;
+      totalCabangAktif++;
+      const cfg = allConfig[sheetName] || {};
+      const templateName = cfg.pesan ? "Custom" : "Default";
+      detailCabang.push(sheetName + ": " + terkirimCount + " (" + templateName + ")");
+    }
+  }
+  
+  let pesan = "📊 RINGKASAN SHEET SENDER\n";
+  pesan += "📅 " + todayStr + "\n\n";
+  pesan += "📈 Total Terkirim: " + totalTerkirim + " pesan\n";
+  pesan += "🏢 Cabang Aktif: " + totalCabangAktif + "\n\n";
+  
+  if (detailCabang.length > 0) {
+    pesan += "📋 Detail Cabang:\n" + detailCabang.join("\n");
+  } else {
+    pesan += "⚠️ Belum ada pengiriman hari ini";
+  }
+  
+  // Kirim ke Telegram Topic
+  const url = "https://api.telegram.org/bot" + TG_BOT_TOKEN + "/sendMessage";
+  const payload = {
+    chat_id: TG_CHAT_ID,
+    message_thread_id: TG_TOPIC_ID,
+    text: pesan
+  };
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+  
+  try {
+    UrlFetchApp.fetch(url, options);
+    Logger.log("Laporan Sheet Sender terkirim ke Telegram Topic");
+  } catch (e) {
+    Logger.log("Error kirim ke Telegram: " + e);
+  }
+};
+
+/**
+ * Auto setup trigger untuk laporan harian
+ */
+globalThis._autoSetupTriggerSheetSender_lib = function() {
+  const props = PropertiesService.getDocumentProperties();
+  const triggerSet = props.getProperty("TRIGGER_LAPORAN_SENDER_SET");
+  
+  if (triggerSet === "true") return;
+  
+  const triggers = ScriptApp.getProjectTriggers();
+  let hasLaporanTrigger = false;
+  
+  for (const trigger of triggers) {
+    if (trigger.getHandlerFunction() === "kirimRingkasanHarianSheetSender") {
+      hasLaporanTrigger = true;
+      break;
+    }
+  }
+  
+  if (!hasLaporanTrigger) {
+    ScriptApp.newTrigger("kirimRingkasanHarianSheetSender")
+      .timeBased()
+      .everyDays(1)
+      .atHour(8)  // 16:30 WITA = 08:30 UTC
+      .nearMinute(30)
+      .create();
+    
+    Logger.log("Auto-setup trigger Sheet Sender berhasil");
+  }
+  
+  props.setProperty("TRIGGER_LAPORAN_SENDER_SET", "true");
+};
+
+// Alias untuk global scope
+globalThis.kirimRingkasanHarianSheetSender = globalThis.kirimRingkasanHarianSheetSender_lib;
+globalThis._autoSetupTriggerSheetSender = globalThis._autoSetupTriggerSheetSender_lib;
