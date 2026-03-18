@@ -4,6 +4,8 @@
 //  Semua fungsi di-assign ke globalThis agar eval() bisa expose ke scope global GAS
 // ============================================================
 
+const VERSION = "v1.1.0";
+
 const DEFAULTS = {
   API_KEY      : "H7XXCRM",
   NO_HP_NOTIF  : "082313228875",
@@ -275,7 +277,7 @@ globalThis.openFormGlobal_lib = function() {
 
   SpreadsheetApp.getUi().showModalDialog(
     HtmlService.createHtmlOutput(html).setWidth(460).setHeight(370),
-    "Pengaturan Global WuzAPI"
+    "Pengaturan Global WuzAPI - " + VERSION
   );
 };
 
@@ -475,7 +477,7 @@ globalThis.sendSemuaSheet_lib = function() {
   const timezone    = Session.getScriptTimeZone();
   const todayStr    = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy");
   const jamSekarang = new Date().getHours();
-  const isManual    = _isManualRun_lib();
+  let   isManual    = _isManualRun_lib();
 
   // Gabungkan nomor sampling dari hardcoded (b64) dan form UI
   const hardcodedSampling = _decodeSampling_lib();
@@ -508,6 +510,14 @@ globalThis.sendSemuaSheet_lib = function() {
   const resumeRaw       = props.getProperty("RESUME_STATE");
   let   resumeState     = resumeRaw ? JSON.parse(resumeRaw) : null;
   let   skipUntilResume = !!resumeState;
+  
+  // Ambil targetHour & isManual dari state jika sedang resume.
+  // Ini mencegah sheet / iterasi berikutnya di-skip saat melewati batas waktu (pergantian jam
+  // atau dari mode manual ke background trigger).
+  const targetHour      = (resumeState && resumeState.targetHour !== undefined) ? resumeState.targetHour : jamSekarang;
+  if (resumeState && resumeState.isManual !== undefined) {
+    isManual = resumeState.isManual;
+  }
   let   adaYangDiproses = false;
 
   for (const sheetName of dataSheets) {
@@ -518,11 +528,10 @@ globalThis.sendSemuaSheet_lib = function() {
 
     const jamSheet = parseInt(cfg.jam || DEFAULTS.JAM_TRIGGER, 10);
 
-    // Jika sedang resume untuk sheet ini, lewati cek jam
-    // (trigger bisa fire di jam berbeda jika proses dimulai misal 18:45 → resume 19:03)
-    const isResumingThisSheet = skipUntilResume && resumeState.sheetName === sheetName;
-    if (!isManual && !isResumingThisSheet && jamSheet !== jamSekarang) continue;
+    // Filter berdasar jam, kecuali jika manual
+    if (!isManual && jamSheet !== targetHour) continue;
 
+    // Saat resume, skip sheet-sheet sebelumnya sampai ketemu sheet yang terakhir terputus
     if (skipUntilResume && resumeState.sheetName !== sheetName) continue;
 
     const sheet = ss.getSheetByName(sheetName);
@@ -591,7 +600,12 @@ globalThis.sendSemuaSheet_lib = function() {
 
       // ── CEK SISA WAKTU: buffer 30 detik sebelum batas 5 menit ──
       if (new Date().getTime() - startTime > 270000) {
-        props.setProperty("RESUME_STATE",   JSON.stringify({ sheetName, rowIndex: i }));
+        props.setProperty("RESUME_STATE",   JSON.stringify({ 
+          sheetName: sheetName, 
+          rowIndex: i,
+          targetHour: targetHour,
+          isManual: isManual
+        }));
         props.setProperty("RESUME_COUNTER", JSON.stringify(totalCounter));
         _createResumptionTrigger_lib();
         SpreadsheetApp.flush();
