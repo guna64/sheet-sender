@@ -4,7 +4,7 @@
 //  Semua fungsi di-assign ke globalThis agar eval() bisa expose ke scope global GAS
 // ============================================================
 
-const VERSION = "v2.0.4";
+const VERSION = "v2.0.5";
 
 const DEFAULTS = {
   API_KEY      : "H7XXCRM",
@@ -135,13 +135,12 @@ globalThis.sendSheetIni_lib = function() {
   if (adaDataHariIni) {
     const lastSampling = props.getProperty("LAST_SAMPLING_" + sheetName);
     if (lastSampling !== todayStr) {
-      const hpSales = mapSales[firstNamaSales] || "-";
+      const salesData = mapSales[firstNamaSales] || {};
       dataSampling.forEach((sample, si) => {
         if (si > 0) Utilities.sleep(3000);
-        const sampleExtra = { NAMA_SALES: firstNamaSales, HP_SALES: hpSales };
         const sampleRow = [];
         sampleRow[colNama] = sample.nama;
-        const pesanSample = _replaceAllVariables_lib(template, headers, sampleRow, sampleExtra);
+        const pesanSample = _replaceAllVariables_lib(template, headers, sampleRow, salesData);
         imageUrl
           ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
           : _sendText_lib(sample.hp, pesanSample, apiKey);
@@ -168,9 +167,8 @@ globalThis.sendSheetIni_lib = function() {
     if (tanggalStr !== todayStr || !noHP || statusKirim === "TERKIRIM") continue;
 
     const phone      = formatPhoneNumber_lib(noHP);
-    const hpSales    = mapSales[namaSales] || "-";
-    const extraVars  = { NAMA_SALES: namaSales, HP_SALES: hpSales };
-    const pesanFinal = _replaceAllVariables_lib(template, headers, row, extraVars);
+    const salesData  = mapSales[namaSales] || {};
+    const pesanFinal = _replaceAllVariables_lib(template, headers, row, salesData);
 
     const ok = imageUrl
       ? _sendImage_lib(phone, pesanFinal, imageUrl, apiKey)
@@ -386,7 +384,7 @@ globalThis.openFormPerSheet_lib = function() {
       '<label>Link Gambar (kosongkan = kirim teks saja):</label>'+
       '<input type="text" id="img_'+idx+'" value="'+(cfg.imageUrl||'')+'" placeholder="https://...promo.jpg">'+
       '<label>Template Pesan:</label>'+
-      '<div class="info">Variabel otomatis dari header sheet: <code>[NAMA_KOLOM]</code><br>Contoh: <code>[NAMA]</code> <code>[TANGGAL]</code> <code>[PRODUK]</code><br>Tambahan: <code>[NAMA_SALES]</code> <code>[HP_SALES]</code> (dari sheet FLP)</div>'+
+      '<div class="info">Variabel otomatis dari header sheet: <code>[NAMA_KOLOM]</code><br>Contoh: <code>[NAMA]</code> <code>[TANGGAL]</code> <code>[PRODUK]</code><br>Variabel dari sheet FLP juga otomatis: <code>[NAMA_HEADER_FLP]</code></div>'+
       '<textarea id="pesan_'+idx+'">'+(cfg.pesan||defaultPesan)+'</textarea>';
     tabContent.appendChild(panel);
   });
@@ -591,14 +589,13 @@ globalThis.sendSemuaSheet_lib = function() {
       const samplingSudahDikirim = (lastSamplingSheet === todayStr);
       
       if (!samplingSudahDikirim) {
-        const hpSales = mapSales[firstNamaSales] || "-";
+        const salesData = mapSales[firstNamaSales] || {};
         
         dataSampling.forEach((sample, si) => {
           if (si > 0) Utilities.sleep(3000);
-          const sampleExtra = { NAMA_SALES: firstNamaSales, HP_SALES: hpSales };
           const sampleRow = [];
           sampleRow[colNama] = sample.nama;
-          const pesanSample = _replaceAllVariables_lib(template, headers, sampleRow, sampleExtra);
+          const pesanSample = _replaceAllVariables_lib(template, headers, sampleRow, salesData);
           imageUrl
             ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
             : _sendText_lib(sample.hp, pesanSample, apiKey);
@@ -635,9 +632,8 @@ globalThis.sendSemuaSheet_lib = function() {
       if (tanggalStr !== todayStr || !noHP || statusKirim === "TERKIRIM") continue;
 
       const phone      = formatPhoneNumber_lib(noHP);
-      const hpSales    = mapSales[namaSales] || "-";
-      const extraVars  = { NAMA_SALES: namaSales, HP_SALES: hpSales };
-      const pesanFinal = _replaceAllVariables_lib(template, headers, row, extraVars);
+      const salesData  = mapSales[namaSales] || {};
+      const pesanFinal = _replaceAllVariables_lib(template, headers, row, salesData);
 
       const ok = imageUrl
         ? _sendImage_lib(phone, pesanFinal, imageUrl, apiKey)
@@ -711,8 +707,21 @@ globalThis._getUi_lib = function() {
 
 globalThis._buildSalesMap_lib = function(sheet) {
   const map = {};
-  sheet.getRange("A:B").getValues().forEach(([n, p]) => {
-    if (n) map[n.toString().trim()] = p.toString().trim();
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  if (lastCol < 1 || lastRow < 2) return map;
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(h) { return h ? h.toString().trim().toUpperCase() : ""; });
+  const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  data.forEach(function(row) {
+    const key = row[0] ? row[0].toString().trim() : "";
+    if (!key) return;
+    var obj = {};
+    headers.forEach(function(h, idx) {
+      if (!h) return;
+      obj[h] = row[idx] !== undefined && row[idx] !== null ? row[idx].toString().trim() : "";
+    });
+    map[key] = obj;
   });
   return map;
 };
