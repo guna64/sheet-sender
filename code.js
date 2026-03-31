@@ -4,7 +4,7 @@
 //  Semua fungsi di-assign ke globalThis agar eval() bisa expose ke scope global GAS
 // ============================================================
 
-const VERSION = "v2.0.3";
+const VERSION = "v2.0.4";
 
 const DEFAULTS = {
   API_KEY      : "H7XXCRM",
@@ -109,16 +109,25 @@ globalThis.sendSheetIni_lib = function() {
   const delayMax = ((cfg && parseInt(cfg.delayMax)) || parseInt(DEFAULTS.DELAY_MAX)) * 1000;
 
   const counter  = { success: 0, failed: 0 };
+  const headers  = _getSheetHeaders_lib(sheet);
   const rows     = _getSheetData_lib(sheet);
+
+  // Index kolom berdasarkan header (fallback ke posisi lama jika tidak ketemu)
+  const colTanggal = headers.indexOf("TANGGAL") !== -1 ? headers.indexOf("TANGGAL") : 0;
+  const colNama    = headers.indexOf("NAMA") !== -1 ? headers.indexOf("NAMA") : 1;
+  const colHP      = headers.indexOf("NO HP") !== -1 ? headers.indexOf("NO HP") : (headers.indexOf("NOHP") !== -1 ? headers.indexOf("NOHP") : (headers.indexOf("HP") !== -1 ? headers.indexOf("HP") : 2));
+  const colSales   = headers.indexOf("NAMA SALES") !== -1 ? headers.indexOf("NAMA SALES") : (headers.indexOf("SALES") !== -1 ? headers.indexOf("SALES") : 3);
+  const colStatus  = headers.indexOf("STATUS") !== -1 ? headers.indexOf("STATUS") : 4;
 
   // ── SAMPLING untuk sheet ini ─────────────────────────────────
   let adaDataHariIni = false;
   let firstNamaSales = "";
   for (let ci = 0; ci < rows.length; ci++) {
     const r = rows[ci];
-    if (_formatTanggal_lib(r[0], timezone) === todayStr && r[2] && r[4]?.toString().trim().toUpperCase() !== "TERKIRIM") {
+    const statusVal = r[colStatus] ? r[colStatus].toString().trim().toUpperCase() : "";
+    if (_formatTanggal_lib(r[colTanggal], timezone) === todayStr && r[colHP] && statusVal !== "TERKIRIM") {
       adaDataHariIni = true;
-      firstNamaSales = r[3] ? r[3].toString().trim() : "";
+      firstNamaSales = r[colSales] ? r[colSales].toString().trim() : "";
       break;
     }
   }
@@ -129,10 +138,10 @@ globalThis.sendSheetIni_lib = function() {
       const hpSales = mapSales[firstNamaSales] || "-";
       dataSampling.forEach((sample, si) => {
         if (si > 0) Utilities.sleep(3000);
-        const pesanSample = template
-          .replace(/\[NAMA\]/g,       sample.nama)
-          .replace(/\[NAMA_SALES\]/g, firstNamaSales)
-          .replace(/\[HP_SALES\]/g,   hpSales);
+        const sampleExtra = { NAMA_SALES: firstNamaSales, HP_SALES: hpSales };
+        const sampleRow = [];
+        sampleRow[colNama] = sample.nama;
+        const pesanSample = _replaceAllVariables_lib(template, headers, sampleRow, sampleExtra);
         imageUrl
           ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
           : _sendText_lib(sample.hp, pesanSample, apiKey);
@@ -151,20 +160,17 @@ globalThis.sendSheetIni_lib = function() {
     }
 
     const row         = rows[i];
-    const tanggalStr  = _formatTanggal_lib(row[0], timezone);
-    const namaKonsumen= row[1] ? row[1].toString().trim() : "";
-    const noHP        = row[2] ? row[2].toString().trim() : "";
-    const namaSales   = row[3] ? row[3].toString().trim() : "";
-    const statusKirim = row[4] ? row[4].toString().trim().toUpperCase() : "";
+    const tanggalStr  = _formatTanggal_lib(row[colTanggal], timezone);
+    const noHP        = row[colHP] ? row[colHP].toString().trim() : "";
+    const namaSales   = row[colSales] ? row[colSales].toString().trim() : "";
+    const statusKirim = row[colStatus] ? row[colStatus].toString().trim().toUpperCase() : "";
 
     if (tanggalStr !== todayStr || !noHP || statusKirim === "TERKIRIM") continue;
 
     const phone      = formatPhoneNumber_lib(noHP);
     const hpSales    = mapSales[namaSales] || "-";
-    const pesanFinal = template
-      .replace(/\[NAMA\]/g,       namaKonsumen)
-      .replace(/\[NAMA_SALES\]/g, namaSales)
-      .replace(/\[HP_SALES\]/g,   hpSales);
+    const extraVars  = { NAMA_SALES: namaSales, HP_SALES: hpSales };
+    const pesanFinal = _replaceAllVariables_lib(template, headers, row, extraVars);
 
     const ok = imageUrl
       ? _sendImage_lib(phone, pesanFinal, imageUrl, apiKey)
@@ -172,7 +178,7 @@ globalThis.sendSheetIni_lib = function() {
 
     if (ok) {
       counter.success++;
-      sheet.getRange(2 + i, 5).setValue("TERKIRIM");
+      sheet.getRange(2 + i, colStatus + 1).setValue("TERKIRIM");
       SpreadsheetApp.flush();
       const delayMs = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
       Utilities.sleep(delayMs);
@@ -380,7 +386,7 @@ globalThis.openFormPerSheet_lib = function() {
       '<label>Link Gambar (kosongkan = kirim teks saja):</label>'+
       '<input type="text" id="img_'+idx+'" value="'+(cfg.imageUrl||'')+'" placeholder="https://...promo.jpg">'+
       '<label>Template Pesan:</label>'+
-      '<div class="info">Variabel: <code>[NAMA]</code> &nbsp;<code>[NAMA_SALES]</code> &nbsp;<code>[HP_SALES]</code></div>'+
+      '<div class="info">Variabel otomatis dari header sheet: <code>[NAMA_KOLOM]</code><br>Contoh: <code>[NAMA]</code> <code>[TANGGAL]</code> <code>[PRODUK]</code><br>Tambahan: <code>[NAMA_SALES]</code> <code>[HP_SALES]</code> (dari sheet FLP)</div>'+
       '<textarea id="pesan_'+idx+'">'+(cfg.pesan||defaultPesan)+'</textarea>';
     tabContent.appendChild(panel);
   });
@@ -544,11 +550,19 @@ globalThis.sendSemuaSheet_lib = function() {
       totalCounter.sheets[sheetName] = { success: 0, failed: 0, sampling: false };
     }
 
+    const headers  = _getSheetHeaders_lib(sheet);
     const rows     = _getSheetData_lib(sheet);
     const template = cfg.pesan    || DEFAULTS.TEMPLATE_PESAN;
     const imageUrl = cfg.imageUrl || "";
     const delayMin = (parseInt(cfg.delayMin) || parseInt(DEFAULTS.DELAY_MIN)) * 1000;
     const delayMax = (parseInt(cfg.delayMax) || parseInt(DEFAULTS.DELAY_MAX)) * 1000;
+
+    // Index kolom berdasarkan header (fallback ke posisi lama)
+    const colTanggal = headers.indexOf("TANGGAL") !== -1 ? headers.indexOf("TANGGAL") : 0;
+    const colNama    = headers.indexOf("NAMA") !== -1 ? headers.indexOf("NAMA") : 1;
+    const colHP      = headers.indexOf("NO HP") !== -1 ? headers.indexOf("NO HP") : (headers.indexOf("NOHP") !== -1 ? headers.indexOf("NOHP") : (headers.indexOf("HP") !== -1 ? headers.indexOf("HP") : 2));
+    const colSales   = headers.indexOf("NAMA SALES") !== -1 ? headers.indexOf("NAMA SALES") : (headers.indexOf("SALES") !== -1 ? headers.indexOf("SALES") : 3);
+    const colStatus  = headers.indexOf("STATUS") !== -1 ? headers.indexOf("STATUS") : 4;
 
     const startRow = (skipUntilResume && resumeState.sheetName === sheetName)
       ? resumeState.rowIndex : 0;
@@ -560,12 +574,12 @@ globalThis.sendSemuaSheet_lib = function() {
     
     for (let checkIdx = startRow; checkIdx < rows.length; checkIdx++) {
       const checkRow = rows[checkIdx];
-      const checkTanggal = _formatTanggal_lib(checkRow[0], timezone);
-      const checkStatus = checkRow[4] ? checkRow[4].toString().trim().toUpperCase() : "";
+      const checkTanggal = _formatTanggal_lib(checkRow[colTanggal], timezone);
+      const checkStatus = checkRow[colStatus] ? checkRow[colStatus].toString().trim().toUpperCase() : "";
       
-      if (checkTanggal === todayStr && checkRow[2] && checkStatus !== "TERKIRIM") {
+      if (checkTanggal === todayStr && checkRow[colHP] && checkStatus !== "TERKIRIM") {
         adaDataHariIni = true;
-        firstNamaSales = checkRow[3] ? checkRow[3].toString().trim() : "";
+        firstNamaSales = checkRow[colSales] ? checkRow[colSales].toString().trim() : "";
         break;
       }
     }
@@ -581,10 +595,10 @@ globalThis.sendSemuaSheet_lib = function() {
         
         dataSampling.forEach((sample, si) => {
           if (si > 0) Utilities.sleep(3000);
-          const pesanSample = template
-            .replace(/\[NAMA\]/g,       sample.nama)
-            .replace(/\[NAMA_SALES\]/g, firstNamaSales)
-            .replace(/\[HP_SALES\]/g,   hpSales);
+          const sampleExtra = { NAMA_SALES: firstNamaSales, HP_SALES: hpSales };
+          const sampleRow = [];
+          sampleRow[colNama] = sample.nama;
+          const pesanSample = _replaceAllVariables_lib(template, headers, sampleRow, sampleExtra);
           imageUrl
             ? _sendImage_lib(sample.hp, pesanSample, imageUrl, apiKey)
             : _sendText_lib(sample.hp, pesanSample, apiKey);
@@ -613,20 +627,17 @@ globalThis.sendSemuaSheet_lib = function() {
       }
 
       const row          = rows[i];
-      const tanggalStr   = _formatTanggal_lib(row[0], timezone);
-      const namaKonsumen = row[1] ? row[1].toString().trim() : "";
-      const noHP         = row[2] ? row[2].toString().trim() : "";
-      const namaSales    = row[3] ? row[3].toString().trim() : "";
-      const statusKirim  = row[4] ? row[4].toString().trim().toUpperCase() : "";
+      const tanggalStr   = _formatTanggal_lib(row[colTanggal], timezone);
+      const noHP         = row[colHP] ? row[colHP].toString().trim() : "";
+      const namaSales    = row[colSales] ? row[colSales].toString().trim() : "";
+      const statusKirim  = row[colStatus] ? row[colStatus].toString().trim().toUpperCase() : "";
 
       if (tanggalStr !== todayStr || !noHP || statusKirim === "TERKIRIM") continue;
 
       const phone      = formatPhoneNumber_lib(noHP);
       const hpSales    = mapSales[namaSales] || "-";
-      const pesanFinal = template
-        .replace(/\[NAMA\]/g,       namaKonsumen)
-        .replace(/\[NAMA_SALES\]/g, namaSales)
-        .replace(/\[HP_SALES\]/g,   hpSales);
+      const extraVars  = { NAMA_SALES: namaSales, HP_SALES: hpSales };
+      const pesanFinal = _replaceAllVariables_lib(template, headers, row, extraVars);
 
       const ok = imageUrl
         ? _sendImage_lib(phone, pesanFinal, imageUrl, apiKey)
@@ -635,7 +646,7 @@ globalThis.sendSemuaSheet_lib = function() {
       if (ok) {
         totalCounter.success++;
         totalCounter.sheets[sheetName].success++;
-        sheet.getRange(2 + i, 5).setValue("TERKIRIM");
+        sheet.getRange(2 + i, colStatus + 1).setValue("TERKIRIM");
         SpreadsheetApp.flush();
 
         // ── Delay random antar pesan ────────────────────────────
@@ -706,9 +717,44 @@ globalThis._buildSalesMap_lib = function(sheet) {
   return map;
 };
 
+globalThis._getSheetHeaders_lib = function(sheet) {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+  return sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(h => h ? h.toString().trim().toUpperCase() : "");
+};
+
 globalThis._getSheetData_lib = function(sheet) {
-  const last = sheet.getLastRow();
-  return last < 2 ? [] : sheet.getRange(2, 1, last - 1, 5).getValues();
+  const last    = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  return (last < 2 || lastCol < 1) ? [] : sheet.getRange(2, 1, last - 1, lastCol).getValues();
+};
+
+// Replace semua [HEADER] di template berdasarkan header sheet + data baris
+globalThis._replaceAllVariables_lib = function(template, headers, row, extraVars) {
+  var result = template;
+  // Replace berdasarkan header kolom
+  headers.forEach(function(h, idx) {
+    if (!h) return;
+    var val = (row[idx] !== undefined && row[idx] !== null) ? row[idx].toString().trim() : "";
+    var pattern = "[" + h + "]";
+    while (result.toUpperCase().indexOf(pattern) !== -1) {
+      var pos = result.toUpperCase().indexOf(pattern);
+      result = result.substring(0, pos) + val + result.substring(pos + pattern.length);
+    }
+  });
+  // Replace variabel tambahan (misal NAMA_SALES, HP_SALES dari FLP)
+  if (extraVars) {
+    Object.keys(extraVars).forEach(function(key) {
+      var pattern = "[" + key.toUpperCase() + "]";
+      var replacement = extraVars[key] || "";
+      while (result.toUpperCase().indexOf(pattern) !== -1) {
+        var pos = result.toUpperCase().indexOf(pattern);
+        result = result.substring(0, pos) + replacement + result.substring(pos + pattern.length);
+      }
+    });
+  }
+  return result;
 };
 
 globalThis._formatTanggal_lib = function(raw, tz) {
